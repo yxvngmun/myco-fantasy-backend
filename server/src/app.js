@@ -11,12 +11,24 @@ import billingRoutes from "./routes/billing.js";
 
 const PgSession = connectPgSimple(session);
 
+function getAllowedOrigins() {
+  const configured = process.env.CLIENT_ORIGIN || "http://127.0.0.1:5173,http://localhost:5173";
+  return configured.split(",").map((origin) => origin.trim()).filter(Boolean);
+}
+
 export function createApp() {
   const app = express();
+  const allowedOrigins = getAllowedOrigins();
 
   app.use(
     cors({
-      origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(new Error(`CORS blocked origin: ${origin}`));
+      },
       credentials: true,
     })
   );

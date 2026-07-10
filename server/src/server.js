@@ -5,5 +5,5 @@ const app = createApp();
 const port = process.env.PORT || 4000;
 
 app.listen(port, () => {
-  console.log(`Fantasy Core API listening on :${port}`);
+  console.log(`Myco Fantasy API listening on :${port}`);
 });

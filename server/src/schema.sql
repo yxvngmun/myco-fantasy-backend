@@ -81,3 +81,48 @@ CREATE TABLE IF NOT EXISTS session (
 ALTER TABLE session DROP CONSTRAINT IF EXISTS session_pkey;
 ALTER TABLE session ADD CONSTRAINT session_pkey PRIMARY KEY (sid) NOT DEFERRABLE INITIALLY IMMEDIATE;
 CREATE INDEX IF NOT EXISTS idx_session_expire ON session (expire);
+
+CREATE TABLE IF NOT EXISTS players (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  club TEXT NOT NULL,
+  short TEXT NOT NULL,
+  color TEXT NOT NULL,
+  jersey_number TEXT,
+  pos TEXT NOT NULL,
+  val NUMERIC NOT NULL,
+  pts INTEGER NOT NULL DEFAULT 0,
+  total_pts INTEGER NOT NULL DEFAULT 0,
+  matches INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'available',
+  opp TEXT,
+  fixture_date TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS fixtures (
+  id SERIAL PRIMARY KEY,
+  round TEXT,
+  event_date TIMESTAMPTZ,
+  date_label TEXT,
+  home_name TEXT NOT NULL,
+  home_code TEXT NOT NULL,
+  home_color TEXT NOT NULL,
+  away_name TEXT NOT NULL,
+  away_code TEXT NOT NULL,
+  away_color TEXT NOT NULL,
+  status TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_squads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  user_identifier TEXT NOT NULL,
+  player_ids JSONB NOT NULL DEFAULT '[]',
+  captain_id INTEGER,
+  bank_remaining NUMERIC NOT NULL DEFAULT 100,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT unique_partner_user UNIQUE (partner_id, user_identifier)
+);
+

@@ -264,25 +264,32 @@ router.post("/squad", requireUserAuth, async (req, res) => {
 
     const userName = req.user.name || "Manager";
 
-    // Read existing chips_used and active_chip from DB
+    // Read existing active_chip from DB
     const { rows: existingSquad } = await pool.query(
-      "SELECT chips_used, active_chip FROM user_squads WHERE partner_id = $1 AND user_identifier = $2 AND tournament_id = $3",
+      "SELECT active_chip FROM user_squads WHERE partner_id = $1 AND user_identifier = $2 AND tournament_id = $3",
       [req.partner.id, req.user.id, tournamentId]
     );
-    let chipsUsed = existingSquad[0]?.chips_used || [];
     let currentActiveChip = existingSquad[0]?.active_chip || null;
 
-    if (activeChip && activeChip !== "none") {
-      if (!chipsUsed.includes(activeChip)) {
-        chipsUsed.push(activeChip);
-      }
-      currentActiveChip = activeChip;
-    } else {
-      if (currentActiveChip) {
-        chipsUsed = chipsUsed.filter((c) => c !== currentActiveChip);
+    // Fetch past used chips from history
+    const { rows: historyRows } = await pool.query(
+      "SELECT DISTINCT chip_used FROM user_gameweek_history WHERE partner_id = $1 AND user_identifier = $2 AND tournament_id = $3 AND chip_used IS NOT NULL",
+      [req.partner.id, req.user.id, tournamentId]
+    );
+    const pastChipsUsed = historyRows.map(r => r.chip_used);
+
+    if (activeChip !== undefined) {
+      if (activeChip && activeChip !== "none") {
+        if (pastChipsUsed.includes(activeChip)) {
+          return res.status(400).json({ error: `Chip ${activeChip} has already been used in a past gameweek` });
+        }
+        currentActiveChip = activeChip;
+      } else {
         currentActiveChip = null;
       }
     }
+
+    const chipsUsed = [...new Set([...pastChipsUsed, ...(currentActiveChip ? [currentActiveChip] : [])])];
 
     // Insert or update user squad
     const { rows } = await pool.query(

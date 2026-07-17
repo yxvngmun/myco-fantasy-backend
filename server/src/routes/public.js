@@ -153,7 +153,7 @@ router.get("/squad", requireUserAuth, async (req, res) => {
       bank: Number(squadRow.bank_remaining),
       captainId: squadRow.captain_id,
       teamName: squadRow.team_name,
-      country: squadRow.country || req.user.country,
+      country: (req.user.country && req.user.country !== "United Kingdom") ? req.user.country : (squadRow.country || req.user.country),
       userName: squadRow.user_name,
       chipsUsed: squadRow.chips_used || [],
       activeChip: squadRow.active_chip || null,

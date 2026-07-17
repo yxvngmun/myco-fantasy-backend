@@ -346,39 +346,26 @@ router.get("/leaderboard", async (req, res) => {
 
   try {
     let query = `
-      WITH squad_players AS (
-        SELECT 
-          us.id AS squad_id,
-          us.user_identifier,
-          us.team_name,
-          us.user_name,
-          us.country,
-          us.captain_id,
-          us.active_chip,
-          (elem.value::text)::int AS player_id,
-          elem.ordinality AS player_order
-        FROM user_squads us,
-        jsonb_array_elements_text(us.player_ids) WITH ORDINALITY AS elem
-        WHERE us.tournament_id = $1 AND us.partner_id = $2
-      )
       SELECT 
-        sp.user_identifier,
-        sp.team_name,
-        sp.user_name,
-        sp.country,
-        COALESCE(SUM(
-          p.total_pts * (CASE WHEN p.id = sp.captain_id THEN (CASE WHEN sp.active_chip = 'triple_captain' THEN 3 ELSE 2 END) ELSE 1 END)
+        us.user_identifier,
+        us.team_name,
+        us.user_name,
+        us.country,
+        COALESCE((
+          SELECT SUM(points) 
+          FROM user_gameweek_history ugh 
+          WHERE ugh.partner_id = us.partner_id 
+            AND ugh.user_identifier = us.user_identifier 
+            AND ugh.tournament_id = us.tournament_id
         ), 0)::int AS total_score
-      FROM squad_players sp
-      JOIN players p ON p.tournament_id = $1 AND p.id = sp.player_id
-      WHERE sp.player_order <= (CASE WHEN sp.active_chip = 'bench_boost' THEN 15 ELSE 11 END)
-      GROUP BY sp.squad_id, sp.user_identifier, sp.team_name, sp.user_name, sp.country
+      FROM user_squads us
+      WHERE us.tournament_id = $1 AND us.partner_id = $2
     `;
 
     const params = [tournamentId, req.partner.id];
 
     if (countryFilter && countryFilter !== "Global") {
-      query += ` HAVING sp.country = $3`;
+      query += ` AND us.country = $3`;
       params.push(countryFilter);
     }
 

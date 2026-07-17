@@ -272,11 +272,16 @@ router.post("/squad", requireUserAuth, async (req, res) => {
     let chipsUsed = existingSquad[0]?.chips_used || [];
     let currentActiveChip = existingSquad[0]?.active_chip || null;
 
-    if (activeChip) {
+    if (activeChip && activeChip !== "none") {
       if (!chipsUsed.includes(activeChip)) {
         chipsUsed.push(activeChip);
       }
       currentActiveChip = activeChip;
+    } else {
+      if (currentActiveChip) {
+        chipsUsed = chipsUsed.filter((c) => c !== currentActiveChip);
+        currentActiveChip = null;
+      }
     }
 
     // Insert or update user squad

@@ -91,6 +91,7 @@ router.get("/squad", requireUserAuth, async (req, res) => {
     return res.status(400).json({ error: "A valid UUID tournament parameter is required" });
   }
   try {
+    console.log("DEBUG: GET /squad req.user:", req.user);
     const { rows } = await pool.query(
       "SELECT * FROM user_squads WHERE partner_id = $1 AND user_identifier = $2 AND tournament_id = $3",
       [req.partner.id, req.user.id, tournamentId]

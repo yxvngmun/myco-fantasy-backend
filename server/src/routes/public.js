@@ -102,6 +102,15 @@ router.get("/squad", requireUserAuth, async (req, res) => {
       return res.json({ squad: null, country: req.user.country });
     }
 
+    // Automatically sync token-verified country to database squad record if it differs
+    if (req.user.country && req.user.country !== squadRow.country) {
+      await pool.query(
+        "UPDATE user_squads SET country = $1, updated_at = now() WHERE partner_id = $2 AND user_identifier = $3 AND tournament_id = $4",
+        [req.user.country, req.partner.id, req.user.id, tournamentId]
+      );
+      squadRow.country = req.user.country;
+    }
+
     // Seed mock history for user if none exists
     const { rows: existingHistory } = await pool.query(
       "SELECT COUNT(*) FROM user_gameweek_history WHERE partner_id = $1 AND user_identifier = $2 AND tournament_id = $3",

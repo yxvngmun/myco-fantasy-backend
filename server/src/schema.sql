@@ -136,9 +136,36 @@ CREATE TABLE IF NOT EXISTS user_squads (
   player_ids JSONB NOT NULL DEFAULT '[]',
   captain_id INTEGER,
   bank_remaining NUMERIC NOT NULL DEFAULT 100,
+  team_name TEXT DEFAULT '',
+  country TEXT DEFAULT '',
+  user_name TEXT DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT unique_partner_user_tournament UNIQUE (partner_id, user_identifier, tournament_id)
+);
+
+ALTER TABLE user_squads ADD COLUMN IF NOT EXISTS team_name TEXT DEFAULT '';
+ALTER TABLE user_squads ADD COLUMN IF NOT EXISTS country TEXT DEFAULT '';
+ALTER TABLE user_squads ADD COLUMN IF NOT EXISTS user_name TEXT DEFAULT '';
+ALTER TABLE user_squads ADD COLUMN IF NOT EXISTS chips_used JSONB DEFAULT '[]';
+ALTER TABLE user_squads ADD COLUMN IF NOT EXISTS active_chip TEXT DEFAULT NULL;
+
+ALTER TABLE players ADD COLUMN IF NOT EXISTS stats_breakdown JSONB DEFAULT '[]';
+ALTER TABLE players ADD COLUMN IF NOT EXISTS price_history JSONB DEFAULT '[]';
+
+CREATE TABLE IF NOT EXISTS user_gameweek_history (
+  id SERIAL PRIMARY KEY,
+  partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  user_identifier TEXT NOT NULL,
+  tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  gameweek INTEGER NOT NULL,
+  player_ids JSONB NOT NULL DEFAULT '[]',
+  captain_id INTEGER,
+  chip_used TEXT,
+  points INTEGER NOT NULL DEFAULT 0,
+  rank INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT unique_user_tournament_gw UNIQUE (partner_id, user_identifier, tournament_id, gameweek)
 );
 
 

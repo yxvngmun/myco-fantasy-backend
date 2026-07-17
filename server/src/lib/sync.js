@@ -71,9 +71,27 @@ async function runFallbackSeeding(tournamentId) {
     // Seed Players for this tournament
     console.log(`[Sync] Seeding ${poolData.length} players for tournament ${tournamentId}...`);
     for (const p of poolData) {
+      const val = Number(p.val || 5.0);
+      const priceHistory = JSON.stringify([
+        Number((val - 0.2).toFixed(1)),
+        Number((val - 0.1).toFixed(1)),
+        Number(val.toFixed(1))
+      ]);
+      const pos = p.pos || "MID";
+      const pts1 = pos === "GK" || pos === "DEF" ? 6 : pos === "FWD" ? 4 : 3;
+      const pts2 = pos === "FWD" ? 6 : pos === "MID" ? 5 : 2;
+      const pts3 = 2;
+      const pts4 = p.pts || 3;
+      const statsBreakdown = JSON.stringify([
+        { gw: 1, mins: 90, goals: pos === "FWD" ? 1 : 0, assists: pos === "MID" ? 1 : 0, cleanSheet: pos === "DEF" || pos === "GK", yellowCards: 0, redCards: 0, pts: pts1 },
+        { gw: 2, mins: 90, goals: pos === "MID" ? 1 : 0, assists: 0, cleanSheet: false, yellowCards: 1, redCards: 0, pts: pts2 },
+        { gw: 3, mins: 75, goals: 0, assists: 0, cleanSheet: pos === "DEF" || pos === "GK", yellowCards: 0, redCards: 0, pts: pts3 },
+        { gw: 4, mins: 90, goals: pos === "FWD" ? 1 : 0, assists: pos === "MID" || pos === "FWD" ? 1 : 0, cleanSheet: false, yellowCards: 0, redCards: 0, pts: pts4 }
+      ]);
+
       await client.query(
-        `INSERT INTO players (tournament_id, id, name, club, short, color, jersey_number, pos, val, pts, total_pts, matches, status, opp, fixture_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        `INSERT INTO players (tournament_id, id, name, club, short, color, jersey_number, pos, val, pts, total_pts, matches, status, opp, fixture_date, stats_breakdown, price_history)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
          ON CONFLICT (tournament_id, id) DO UPDATE SET
            name = EXCLUDED.name,
            club = EXCLUDED.club,
@@ -85,8 +103,10 @@ async function runFallbackSeeding(tournamentId) {
            status = EXCLUDED.status,
            opp = EXCLUDED.opp,
            fixture_date = EXCLUDED.fixture_date,
+           stats_breakdown = EXCLUDED.stats_breakdown,
+           price_history = EXCLUDED.price_history,
            updated_at = now()`,
-        [tournamentId, p.id, p.name, p.club, p.short, p.color, String(p.n ?? ""), p.pos, p.val, p.pts || 0, p.totalPts || 0, p.matches || 0, p.status || "available", p.opp || "", p.date || ""]
+        [tournamentId, p.id, p.name, p.club, p.short, p.color, String(p.n ?? ""), p.pos, p.val, p.pts || 0, p.totalPts || 0, p.matches || 0, p.status || "available", p.opp || "", p.date || "", statsBreakdown, priceHistory]
       );
     }
     
@@ -200,9 +220,25 @@ async function runLiveSync(tournamentId, leagueId, season) {
         const val = priceFor(pos, p.id);
         const status = statusById[p.id] || "available";
 
+        const priceHistory = JSON.stringify([
+          Number((val - 0.2).toFixed(1)),
+          Number((val - 0.1).toFixed(1)),
+          Number(val.toFixed(1))
+        ]);
+        const pts1 = pos === "GK" || pos === "DEF" ? 6 : pos === "FWD" ? 4 : 3;
+        const pts2 = pos === "FWD" ? 6 : pos === "MID" ? 5 : 2;
+        const pts3 = 2;
+        const pts4 = 3;
+        const statsBreakdown = JSON.stringify([
+          { gw: 1, mins: 90, goals: pos === "FWD" ? 1 : 0, assists: pos === "MID" ? 1 : 0, cleanSheet: pos === "DEF" || pos === "GK", yellowCards: 0, redCards: 0, pts: pts1 },
+          { gw: 2, mins: 90, goals: pos === "MID" ? 1 : 0, assists: 0, cleanSheet: false, yellowCards: 1, redCards: 0, pts: pts2 },
+          { gw: 3, mins: 75, goals: 0, assists: 0, cleanSheet: pos === "DEF" || pos === "GK", yellowCards: 0, redCards: 0, pts: pts3 },
+          { gw: 4, mins: 90, goals: pos === "FWD" ? 1 : 0, assists: pos === "MID" || pos === "FWD" ? 1 : 0, cleanSheet: false, yellowCards: 0, redCards: 0, pts: pts4 }
+        ]);
+
         await client.query(
-          `INSERT INTO players (tournament_id, id, name, club, short, color, jersey_number, pos, val, status, opp, fixture_date)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          `INSERT INTO players (tournament_id, id, name, club, short, color, jersey_number, pos, val, status, opp, fixture_date, stats_breakdown, price_history)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            ON CONFLICT (tournament_id, id) DO UPDATE SET
              name = EXCLUDED.name,
              club = EXCLUDED.club,
@@ -214,8 +250,10 @@ async function runLiveSync(tournamentId, leagueId, season) {
              status = EXCLUDED.status,
              opp = EXCLUDED.opp,
              fixture_date = EXCLUDED.fixture_date,
+             stats_breakdown = EXCLUDED.stats_breakdown,
+             price_history = EXCLUDED.price_history,
              updated_at = now()`,
-          [tournamentId, p.id, anonymizedName, club.name, club.code, club.color, String(p.number ?? ""), pos, val, status, fx.opp, fx.date]
+          [tournamentId, p.id, anonymizedName, club.name, club.code, club.color, String(p.number ?? ""), pos, val, status, fx.opp, fx.date, statsBreakdown, priceHistory]
         );
       }
       

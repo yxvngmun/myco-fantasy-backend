@@ -25,11 +25,21 @@ export function createApp() {
   app.use(
     cors({
       origin(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin) {
           callback(null, true);
           return;
         }
-        callback(new Error(`CORS blocked origin: ${origin}`));
+        const allowedOrigins = getAllowedOrigins();
+        const isAllowed = allowedOrigins.includes(origin) ||
+          origin.endsWith(".vercel.app") ||
+          /^https?:\/\/localhost:\d+$/.test(origin) ||
+          /^https?:\/\/127\.0\.0\.1:\d+$/.test(origin);
+
+        if (isAllowed) {
+          callback(null, true);
+        } else {
+          callback(new Error(`CORS blocked origin: ${origin}`));
+        }
       },
       credentials: true,
     })

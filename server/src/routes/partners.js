@@ -3,6 +3,7 @@ import { pool } from "../db.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { toCsv } from "../lib/csv.js";
 import { getPartnerHealth } from "../lib/health.js";
+import { syncTournamentData } from "../lib/sync.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -118,6 +119,7 @@ const patchableFields = {
   name: "name",
   email: "email",
   logo: "logo",
+  subdomain: "subdomain",
   primaryColor: "primary_color",
   secondaryColor: "secondary_color",
   contactName: "contact_name",
@@ -175,6 +177,51 @@ router.patch("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   await pool.query("DELETE FROM partners WHERE id = $1", [req.params.id]);
   res.status(204).end();
+});
+
+router.get("/:id/tournaments", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM tournaments WHERE partner_id = $1 ORDER BY created_at DESC",
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch tournaments" });
+  }
+});
+
+router.post("/:id/tournaments", async (req, res) => {
+  const { name, sportKey, status, apiLeagueId, apiSeason } = req.body || {};
+  if (!name || !sportKey) {
+    return res.status(400).json({ error: "name and sportKey are required" });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO tournaments (partner_id, name, sport_key, status, api_league_id, api_season)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [req.params.id, name, sportKey, status || "Active", apiLeagueId || null, apiSeason || null]
+    );
+    
+    // Update partner live_tournaments count
+    await pool.query(
+      "UPDATE partners SET live_tournaments = (SELECT COUNT(*) FROM tournaments WHERE partner_id = $1 AND status = 'Active') WHERE id = $1",
+      [req.params.id]
+    );
+
+    // Trigger sync in background
+    const tournament = rows[0];
+    syncTournamentData(tournament.id, apiLeagueId, apiSeason).catch((err) => {
+      console.error(`[Background Sync Error] for tournament ${tournament.id}:`, err.message || err);
+    });
+
+    res.status(201).json(tournament);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create tournament" });
+  }
 });
 
 export default router;

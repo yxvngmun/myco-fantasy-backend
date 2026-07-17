@@ -82,8 +82,20 @@ ALTER TABLE session DROP CONSTRAINT IF EXISTS session_pkey;
 ALTER TABLE session ADD CONSTRAINT session_pkey PRIMARY KEY (sid) NOT DEFERRABLE INITIALLY IMMEDIATE;
 CREATE INDEX IF NOT EXISTS idx_session_expire ON session (expire);
 
+CREATE TABLE IF NOT EXISTS tournaments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  sport_key TEXT NOT NULL REFERENCES sports_config(key),
+  status TEXT NOT NULL DEFAULT 'Active',
+  api_league_id INTEGER,
+  api_season INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS players (
-  id INTEGER PRIMARY KEY,
+  tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  id INTEGER NOT NULL,
   name TEXT NOT NULL,
   club TEXT NOT NULL,
   short TEXT NOT NULL,
@@ -97,11 +109,13 @@ CREATE TABLE IF NOT EXISTS players (
   status TEXT NOT NULL DEFAULT 'available',
   opp TEXT,
   fixture_date TEXT,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tournament_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS fixtures (
   id SERIAL PRIMARY KEY,
+  tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
   round TEXT,
   event_date TIMESTAMPTZ,
   date_label TEXT,
@@ -118,11 +132,13 @@ CREATE TABLE IF NOT EXISTS user_squads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
   user_identifier TEXT NOT NULL,
+  tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
   player_ids JSONB NOT NULL DEFAULT '[]',
   captain_id INTEGER,
   bank_remaining NUMERIC NOT NULL DEFAULT 100,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT unique_partner_user UNIQUE (partner_id, user_identifier)
+  CONSTRAINT unique_partner_user_tournament UNIQUE (partner_id, user_identifier, tournament_id)
 );
+
 

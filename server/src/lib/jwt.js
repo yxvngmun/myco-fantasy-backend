@@ -22,8 +22,9 @@ export function verifyJwt(token, secret) {
     const payloadJson = Buffer.from(payloadB64, "base64url").toString("utf8");
     const payload = JSON.parse(payloadJson);
 
-    // Check expiration
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+    // Check expiration with 5-minute clock skew leeway
+    const skewLeeway = 300;
+    if (payload.exp && (payload.exp + skewLeeway) < Math.floor(Date.now() / 1000)) {
       console.warn("JWT Verification failed: token expired");
       return null;
     }

@@ -318,6 +318,15 @@ router.post("/squad", requireUserAuth, async (req, res) => {
       ]
     );
 
+    // Update partner users and contests counts in the partners table
+    await pool.query(
+      `UPDATE partners SET 
+         users = (SELECT COUNT(DISTINCT user_identifier) FROM user_squads WHERE partner_id = $1),
+         contests = (SELECT COUNT(DISTINCT tournament_id) FROM user_squads WHERE partner_id = $1)
+       WHERE id = $1`,
+      [req.partner.id]
+    );
+
     res.json({
       success: true,
       squad: players.map(serializePlayer),

@@ -48,6 +48,7 @@ export async function requirePartnerAuth(req, res, next) {
           id: payload.userId,
           name: payload.username || payload.name,
           email: payload.email,
+          country: payload.country || "United Kingdom",
         };
       }
     }

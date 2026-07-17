@@ -98,7 +98,7 @@ router.get("/squad", requireUserAuth, async (req, res) => {
 
     const squadRow = rows[0];
     if (!squadRow) {
-      return res.json({ squad: null });
+      return res.json({ squad: null, country: req.user.country });
     }
 
     // Seed mock history for user if none exists
@@ -166,7 +166,7 @@ router.get("/squad", requireUserAuth, async (req, res) => {
       bank: Number(squadRow.bank_remaining),
       captainId: squadRow.captain_id,
       teamName: squadRow.team_name,
-      country: squadRow.country,
+      country: squadRow.country || req.user.country,
       userName: squadRow.user_name,
       chipsUsed: squadRow.chips_used || [],
       activeChip: squadRow.active_chip || null,

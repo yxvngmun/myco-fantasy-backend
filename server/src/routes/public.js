@@ -137,30 +137,16 @@ router.get("/squad", requireUserAuth, async (req, res) => {
     const squadList = playerIds
       .map((id) => players.find((p) => p.id === id))
       .filter(Boolean)
-      .map((p) => {
+      .map((p, index) => {
         const playerObj = serializePlayer(p);
         // Attach captain status
         if (playerObj.id === squadRow.captain_id) {
           playerObj.c = true;
         }
-        // Set default onPitch value
-        // The frontend can swap them around, but initially we place the first 11 on the pitch
-        // and the remaining 4 on the bench.
-        playerObj.onPitch = false; 
+        // Set onPitch value based on database order (first 11 are starters)
+        playerObj.onPitch = index < 11; 
         return playerObj;
       });
-
-    // Simple default: first GK on pitch, first 3-5 DEFs on pitch, first 3-5 MIDs, and first 1-3 FWDs.
-    // Let's mark players on pitch:
-    const positionCounts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
-    const positionLimits = { GK: 1, DEF: 4, MID: 4, FWD: 2 }; // e.g. 4-4-2 standard starters
-    
-    for (const p of squadList) {
-      if (positionCounts[p.pos] < positionLimits[p.pos]) {
-        p.onPitch = true;
-        positionCounts[p.pos]++;
-      }
-    }
 
     res.json({
       squad: squadList,
@@ -444,24 +430,15 @@ router.get("/history", requireUserAuth, async (req, res) => {
       const squadList = playerIds
         .map((id) => players.find((p) => p.id === id))
         .filter(Boolean)
-        .map((p) => {
+        .map((p, index) => {
           const playerObj = serializePlayer(p);
           if (playerObj.id === h.captain_id) {
             playerObj.c = true;
           }
-          playerObj.onPitch = false;
+          // Set onPitch value based on database order (first 11 are starters)
+          playerObj.onPitch = index < 11;
           return playerObj;
         });
-
-      // Populate onPitch based on order
-      const positionCounts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
-      const positionLimits = { GK: 1, DEF: 4, MID: 4, FWD: 2 };
-      for (const p of squadList) {
-        if (positionCounts[p.pos] < positionLimits[p.pos]) {
-          p.onPitch = true;
-          positionCounts[p.pos]++;
-        }
-      }
 
       historyList.push({
         gameweek: h.gameweek,

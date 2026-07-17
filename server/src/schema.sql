@@ -168,4 +168,16 @@ CREATE TABLE IF NOT EXISTS user_gameweek_history (
   CONSTRAINT unique_user_tournament_gw UNIQUE (partner_id, user_identifier, tournament_id, gameweek)
 );
 
+-- Clean up duplicate fixtures
+DELETE FROM fixtures a USING fixtures b
+WHERE a.id > b.id 
+  AND a.tournament_id = b.tournament_id 
+  AND a.round = b.round 
+  AND a.home_name = b.home_name 
+  AND a.away_name = b.away_name;
+
+-- Add unique constraint
+ALTER TABLE fixtures ADD CONSTRAINT unique_tournament_fixture UNIQUE (tournament_id, round, home_name, away_name);
+
+
 

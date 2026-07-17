@@ -115,7 +115,15 @@ async function runFallbackSeeding(tournamentId) {
     for (const f of fixturesData) {
       await client.query(
         `INSERT INTO fixtures (tournament_id, round, event_date, date_label, home_name, home_code, home_color, away_name, away_code, away_color, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (tournament_id, round, home_name, away_name) DO UPDATE SET
+           event_date = EXCLUDED.event_date,
+           date_label = EXCLUDED.date_label,
+           home_code = EXCLUDED.home_code,
+           home_color = EXCLUDED.home_color,
+           away_code = EXCLUDED.away_code,
+           away_color = EXCLUDED.away_color,
+           status = EXCLUDED.status`,
         [tournamentId, f.round, f.date, f.dateLabel, f.home.name, f.home.code, f.home.color, f.away.name, f.away.code, f.away.color, f.status]
       );
     }

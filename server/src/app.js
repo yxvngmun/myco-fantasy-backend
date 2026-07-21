@@ -102,7 +102,32 @@ export function createApp() {
   app.use("/api/billing", billingRoutes);
   app.use("/api/public", publicApiLimiter, publicRoutes);
 
-  app.get("/api/health", (req, res) => res.json({ ok: true }));
+  // Run lightweight data patch on startup to zero out unplayed Round 4 stats in DB
+  (async () => {
+    try {
+      const { rows } = await pool.query("SELECT tournament_id, id, stats_breakdown FROM players");
+      for (const p of rows) {
+        if (Array.isArray(p.stats_breakdown) && p.stats_breakdown.length > 0) {
+          let changed = false;
+          const updated = p.stats_breakdown.map((row) => {
+            if (row.gw === 4 && (row.pts > 0 || row.mins > 0)) {
+              changed = true;
+              return { ...row, mins: 0, goals: 0, assists: 0, cleanSheet: false, yellowCards: 0, redCards: 0, saves: 0, pts: 0 };
+            }
+            return row;
+          });
+          if (changed) {
+            await pool.query(
+              "UPDATE players SET stats_breakdown = $1, updated_at = now() WHERE tournament_id = $2 AND id = $3",
+              [JSON.stringify(updated), p.tournament_id, p.id]
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Startup stats patch error:", e.message);
+    }
+  })();
 
   return app;
 }

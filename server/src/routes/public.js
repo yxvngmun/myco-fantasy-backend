@@ -7,8 +7,148 @@ const router = Router();
 // All public routes require partner tenant verification (via subdomain)
 router.use(requirePartnerAuth);
 
+// Deterministically generate randomized matchday metrics (goals, assists, mins, clean sheets, cards, saves)
+function generatePlayerGameweekStats(playerId, pos, gameweek) {
+  // Round 4 (and beyond) has not started yet — return 0 points and 0 minutes
+  if (gameweek >= 4) {
+    return {
+      gw: gameweek,
+      mins: 0,
+      goals: 0,
+      assists: 0,
+      cleanSheet: false,
+      yellowCards: 0,
+      redCards: 0,
+      saves: 0,
+      pts: 0,
+    };
+  }
+
+  const seed = Math.abs(Math.sin(Number(playerId || 1) * 997 + gameweek * 37) * 10000);
+  const intSeed = Math.floor(seed) % 100;
+
+  // Minutes: 10% unplayed (0 mins), 15% sub (20-60 mins), 75% starter (70-90 mins)
+  let mins = 90;
+  if (intSeed < 10) {
+    mins = 0; // Did not play (0 mins) -> candidate for bench auto-substitution
+  } else if (intSeed < 25) {
+    mins = 20 + ((intSeed * 3) % 41);
+  } else {
+    mins = 70 + ((intSeed * 2) % 21);
+  }
+
+  let goals = 0;
+  let assists = 0;
+  let cleanSheet = false;
+  let yellowCards = 0;
+  let redCards = 0;
+  let saves = 0;
+
+  if (mins > 0) {
+    if (pos === "FWD") {
+      if (intSeed > 75) goals = 1;
+      if (intSeed > 88) goals = 2;
+      if (intSeed > 97) goals = 3; // Hat-trick
+      if ((intSeed + 17) % 100 > 70) assists = 1;
+    } else if (pos === "MID") {
+      if (intSeed > 80) goals = 1;
+      if (intSeed > 94) goals = 2;
+      if ((intSeed + 13) % 100 > 65) assists = 1;
+      if ((intSeed + 13) % 100 > 92) assists = 2;
+      if (mins >= 60 && intSeed % 100 > 60) cleanSheet = true;
+    } else if (pos === "DEF") {
+      if (intSeed > 90) goals = 1;
+      if ((intSeed + 7) % 100 > 80) assists = 1;
+      if (mins >= 60 && intSeed % 100 > 45) cleanSheet = true;
+    } else if (pos === "GK") {
+      if (mins >= 60 && intSeed % 100 > 45) cleanSheet = true;
+      saves = 2 + (intSeed % 6);
+    }
+
+    if ((intSeed * 3) % 100 > 86) yellowCards = 1;
+    if ((intSeed * 7) % 100 > 97) redCards = 1;
+  }
+
+  // Calculate Fantasy Points
+  let pts = 0;
+  if (mins >= 60) pts += 2;
+  else if (mins > 0) pts += 1;
+
+  pts += goals * 6;
+  pts += assists * 3;
+  if (cleanSheet) {
+    if (pos === "GK" || pos === "DEF") pts += 4;
+    if (pos === "MID") pts += 1;
+  }
+  if (saves >= 3) pts += Math.floor(saves / 3);
+
+  pts -= yellowCards * 1;
+  pts -= redCards * 3;
+
+  if (mins > 0 && pts < 1 && redCards === 0) {
+    pts = 1;
+  }
+
+  return {
+    gw: gameweek,
+    mins,
+    goals,
+    assists,
+    cleanSheet,
+    yellowCards,
+    redCards,
+    saves,
+    pts,
+  };
+}
+
+// Ensures the starting 11 (first 11 elements) has EXACTLY 1 Goalkeeper
+function ensureValidStartingXI(playersList) {
+  if (!Array.isArray(playersList) || playersList.length < 11) return playersList;
+
+  const starters = [...playersList.slice(0, 11)];
+  const bench = [...playersList.slice(11)];
+
+  const gkIndexesInStarters = starters
+    .map((p, idx) => (p && p.pos === "GK" ? idx : -1))
+    .filter((idx) => idx !== -1);
+
+  if (gkIndexesInStarters.length === 0) {
+    // Swap first GK found on bench into 11th starter slot
+    const benchGkIdx = bench.findIndex((p) => p && p.pos === "GK");
+    if (benchGkIdx !== -1) {
+      const gk = bench[benchGkIdx];
+      const outfield = starters[10];
+      starters[10] = gk;
+      bench[benchGkIdx] = outfield;
+    }
+  } else if (gkIndexesInStarters.length > 1) {
+    // Keep 1 GK in starters, swap extra GK with an outfield player on bench
+    const extraGkIdx = gkIndexesInStarters[1];
+    const benchOutfieldIdx = bench.findIndex((p) => p && p.pos !== "GK");
+    if (benchOutfieldIdx !== -1) {
+      const extraGk = starters[extraGkIdx];
+      const benchOutfield = bench[benchOutfieldIdx];
+      starters[extraGkIdx] = benchOutfield;
+      bench[benchOutfieldIdx] = extraGk;
+    }
+  }
+
+  return [...starters, ...bench];
+}
+
 // Helper: Maps database player row to frontend pool.json format
 function serializePlayer(p) {
+  const breakdown = (p.stats_breakdown && p.stats_breakdown.length > 0)
+    ? p.stats_breakdown
+    : [1, 2, 3, 4].map((gw) => generatePlayerGameweekStats(p.id, p.pos, gw));
+
+  const totalPoints = breakdown.reduce((sum, row) => sum + row.pts, 0);
+
+  // Filter completed/played gameweeks (GW1-3) to find latest played points
+  const playedRows = breakdown.filter((b) => b.mins > 0 || (b.gw < 4 && b.pts > 0));
+  const latestPlayed = playedRows[playedRows.length - 1];
+
   return {
     id: p.id,
     name: p.name,
@@ -18,14 +158,14 @@ function serializePlayer(p) {
     n: p.jersey_number ? Number(p.jersey_number) || p.jersey_number : "",
     pos: p.pos,
     val: Number(p.val),
-    pts: p.pts,
-    totalPts: p.total_pts,
-    matches: p.matches,
+    pts: latestPlayed ? latestPlayed.pts : 0,
+    totalPts: totalPoints || p.total_pts || 0,
+    matches: breakdown.filter((b) => b.mins > 0).length,
     status: p.status,
     opp: p.opp,
     date: p.fixture_date,
     ownership: Number(p.ownership_percent || 0),
-    statsBreakdown: p.stats_breakdown || [],
+    statsBreakdown: breakdown,
     priceHistory: p.price_history || [],
   };
 }
@@ -157,23 +297,26 @@ router.get("/squad", requireUserAuth, async (req, res) => {
       [tournamentId, playerIds]
     );
 
-    // Order players to match initial selection order or group by position
-    const squadList = playerIds
+    // Order players to match initial selection order and ensure 1 GK in starting 11
+    let squadList = playerIds
       .map((id) => players.find((p) => p.id === id))
-      .filter(Boolean)
-      .map((p, index) => {
-        const playerObj = serializePlayer(p);
-        // Attach captain status
-        if (playerObj.id === squadRow.captain_id) {
-          playerObj.c = true;
-        }
-        // Set onPitch value based on database order (first 11 are starters)
-        playerObj.onPitch = index < 11; 
-        return playerObj;
-      });
+      .filter(Boolean);
+
+    squadList = ensureValidStartingXI(squadList);
+
+    const formattedSquad = squadList.map((p, index) => {
+      const playerObj = serializePlayer(p);
+      // Attach captain status
+      if (playerObj.id === squadRow.captain_id) {
+        playerObj.c = true;
+      }
+      // Set onPitch value based on database order (first 11 are starters)
+      playerObj.onPitch = index < 11; 
+      return playerObj;
+    });
 
     res.json({
-      squad: squadList,
+      squad: formattedSquad,
       bank: Number(squadRow.bank_remaining),
       captainId: squadRow.captain_id,
       teamName: squadRow.team_name,
@@ -267,7 +410,8 @@ router.post("/squad", requireUserAuth, async (req, res) => {
       }
     }
 
-    if (captainId && !playerIds.includes(Number(captainId))) {
+    const numCaptainId = captainId ? Number(captainId) : null;
+    if (numCaptainId && !playerIds.map(Number).includes(numCaptainId)) {
       return res.status(400).json({ error: "Captain must be a player in your squad" });
     }
 
@@ -305,6 +449,10 @@ router.post("/squad", requireUserAuth, async (req, res) => {
     const sanitizedTeamName = sanitizeInput(teamName || "");
     const sanitizedUserName = sanitizeInput(userName || "Manager");
 
+    const playerObjs = playerIds.map((id) => players.find((p) => p.id === id)).filter(Boolean);
+    const validOrderedList = ensureValidStartingXI(playerObjs);
+    const validPlayerIds = validOrderedList.map((p) => p.id);
+
     // Insert or update user squad
     const { rows } = await pool.query(
       `INSERT INTO user_squads (partner_id, user_identifier, tournament_id, player_ids, captain_id, bank_remaining, team_name, country, user_name, chips_used, active_chip, updated_at)
@@ -325,7 +473,7 @@ router.post("/squad", requireUserAuth, async (req, res) => {
         req.partner.id,
         req.user.id,
         tournamentId,
-        JSON.stringify(playerIds),
+        JSON.stringify(validPlayerIds),
         captainId || null,
         bankRemaining,
         sanitizedTeamName,
@@ -450,26 +598,92 @@ router.get("/history", requireUserAuth, async (req, res) => {
         [tournamentId, playerIds]
       );
 
-      const squadList = playerIds
+      let rawSquad = playerIds
         .map((id) => players.find((p) => p.id === id))
-        .filter(Boolean)
-        .map((p, index) => {
-          const playerObj = serializePlayer(p);
-          if (playerObj.id === h.captain_id) {
-            playerObj.c = true;
+        .filter(Boolean);
+
+      rawSquad = ensureValidStartingXI(rawSquad);
+
+      const squadList = rawSquad.map((p, index) => {
+        const playerObj = serializePlayer(p);
+        if (String(playerObj.id) === String(h.captain_id)) {
+          playerObj.c = true;
+        }
+        // Set onPitch value based on database order (first 11 are starters)
+        playerObj.onPitch = index < 11;
+
+        // Generate dynamic player matchday stats for this gameweek
+        const matchStats = generatePlayerGameweekStats(p.id, p.pos, h.gameweek);
+        playerObj.pts = matchStats.pts;
+        playerObj.mins = matchStats.mins;
+        playerObj.goals = matchStats.goals;
+        playerObj.assists = matchStats.assists;
+        playerObj.cleanSheet = matchStats.cleanSheet;
+        playerObj.yellowCards = matchStats.yellowCards;
+        playerObj.redCards = matchStats.redCards;
+        playerObj.saves = matchStats.saves;
+
+        return playerObj;
+      });
+
+      // Automatic Bench Substitutions for 0-minute Starters according to official Fantasy Rules
+      const substitutions = [];
+      const starters = squadList.filter((p) => p.onPitch);
+      const bench = squadList.filter((p) => !p.onPitch);
+
+      for (const starter of starters) {
+        if (starter.mins === 0) {
+          starter.autoSubbed = "OUT"; // Mark 0-min starter as Subbed OUT
+          let subIn = null;
+
+          if (starter.pos === "GK") {
+            // Goalkeeper can ONLY be replaced by the bench Goalkeeper
+            subIn = bench.find((b) => b.pos === "GK" && b.mins > 0 && !b.usedAsSub);
+          } else {
+            // Outfield players can ONLY be replaced by bench Outfielders (non-GK)
+            subIn = bench.find((b) => b.pos !== "GK" && b.mins > 0 && !b.usedAsSub);
           }
-          // Set onPitch value based on database order (first 11 are starters)
-          playerObj.onPitch = index < 11;
-          return playerObj;
-        });
+
+          if (subIn) {
+            starter.onPitch = false;
+            subIn.onPitch = true;
+            subIn.autoSubbed = "IN";
+            subIn.usedAsSub = true;
+            substitutions.push({
+              outPlayer: starter.name,
+              inPlayer: subIn.name,
+              pos: starter.pos,
+              gw: h.gameweek,
+            });
+          }
+        }
+      }
+
+      // If captain did not play (0 mins), reassign captain multiplier to first active starter
+      let activeCaptainId = h.captain_id;
+      const captainPlayer = squadList.find((p) => String(p.id) === String(h.captain_id));
+      if (captainPlayer && captainPlayer.mins === 0) {
+        const viceCaptain = squadList.find((p) => p.onPitch && String(p.id) !== String(h.captain_id) && p.mins > 0);
+        if (viceCaptain) {
+          activeCaptainId = viceCaptain.id;
+          viceCaptain.isViceCaptainUsed = true;
+        }
+      }
+
+      // Calculate total matchday points dynamically from starter player points (including captain multiplier)
+      const mult = (p) => String(p.id) === String(activeCaptainId) ? (h.chip_used === "triple_captain" ? 3 : 2) : 1;
+      const calculatedTotal = squadList
+        .filter((p) => h.chip_used === "bench_boost" || p.onPitch)
+        .reduce((sum, p) => sum + (p.pts * mult(p)), 0);
 
       historyList.push({
         gameweek: h.gameweek,
         squad: squadList,
-        points: h.points,
+        points: calculatedTotal || h.points,
         rank: h.rank,
         chipUsed: h.chip_used,
-        captainId: h.captain_id
+        captainId: activeCaptainId,
+        substitutions,
       });
     }
 

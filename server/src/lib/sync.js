@@ -81,12 +81,11 @@ async function runFallbackSeeding(tournamentId) {
       const pts1 = pos === "GK" || pos === "DEF" ? 6 : pos === "FWD" ? 4 : 3;
       const pts2 = pos === "FWD" ? 6 : pos === "MID" ? 5 : 2;
       const pts3 = 2;
-      const pts4 = p.pts || 3;
       const statsBreakdown = JSON.stringify([
         { gw: 1, mins: 90, goals: pos === "FWD" ? 1 : 0, assists: pos === "MID" ? 1 : 0, cleanSheet: pos === "DEF" || pos === "GK", yellowCards: 0, redCards: 0, pts: pts1 },
         { gw: 2, mins: 90, goals: pos === "MID" ? 1 : 0, assists: 0, cleanSheet: false, yellowCards: 1, redCards: 0, pts: pts2 },
         { gw: 3, mins: 75, goals: 0, assists: 0, cleanSheet: pos === "DEF" || pos === "GK", yellowCards: 0, redCards: 0, pts: pts3 },
-        { gw: 4, mins: 90, goals: pos === "FWD" ? 1 : 0, assists: pos === "MID" || pos === "FWD" ? 1 : 0, cleanSheet: false, yellowCards: 0, redCards: 0, pts: pts4 }
+        { gw: 4, mins: 0, goals: 0, assists: 0, cleanSheet: false, yellowCards: 0, redCards: 0, pts: 0 }
       ]);
 
       await client.query(
@@ -236,12 +235,11 @@ async function runLiveSync(tournamentId, leagueId, season) {
         const pts1 = pos === "GK" || pos === "DEF" ? 6 : pos === "FWD" ? 4 : 3;
         const pts2 = pos === "FWD" ? 6 : pos === "MID" ? 5 : 2;
         const pts3 = 2;
-        const pts4 = 3;
         const statsBreakdown = JSON.stringify([
           { gw: 1, mins: 90, goals: pos === "FWD" ? 1 : 0, assists: pos === "MID" ? 1 : 0, cleanSheet: pos === "DEF" || pos === "GK", yellowCards: 0, redCards: 0, pts: pts1 },
           { gw: 2, mins: 90, goals: pos === "MID" ? 1 : 0, assists: 0, cleanSheet: false, yellowCards: 1, redCards: 0, pts: pts2 },
           { gw: 3, mins: 75, goals: 0, assists: 0, cleanSheet: pos === "DEF" || pos === "GK", yellowCards: 0, redCards: 0, pts: pts3 },
-          { gw: 4, mins: 90, goals: pos === "FWD" ? 1 : 0, assists: pos === "MID" || pos === "FWD" ? 1 : 0, cleanSheet: false, yellowCards: 0, redCards: 0, pts: pts4 }
+          { gw: 4, mins: 0, goals: 0, assists: 0, cleanSheet: false, yellowCards: 0, redCards: 0, pts: 0 }
         ]);
 
         await client.query(

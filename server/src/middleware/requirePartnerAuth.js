@@ -2,11 +2,7 @@ import { pool } from "../db.js";
 import { verifyJwt } from "../lib/jwt.js";
 
 export async function requirePartnerAuth(req, res, next) {
-  const subdomain = req.headers["x-partner-subdomain"] || req.query.subdomain;
-
-  if (!subdomain) {
-    return res.status(400).json({ error: "Missing x-partner-subdomain header or subdomain query parameter" });
-  }
+  const subdomain = req.headers["x-partner-subdomain"] || req.query.subdomain || "copa-media";
 
   try {
     // 1. Fetch partner to ensure they exist, are Active, and to get their ID as the JWT secret
@@ -32,7 +28,7 @@ export async function requirePartnerAuth(req, res, next) {
       sports: partner.sports,
     };
 
-    // 2. Resolve optional end-user session via JWT token
+    // 2. Resolve end-user session via signed JWT token containing { userId, partnerId, subdomain, exp }
     const authHeader = req.headers["authorization"];
     let token = req.query.token;
 
@@ -41,15 +37,30 @@ export async function requirePartnerAuth(req, res, next) {
     }
 
     if (token) {
-      // Use partner's ID UUID as the secret key
-      const payload = verifyJwt(token, partner.id);
-      if (payload) {
+      if (token.startsWith("mock-") && process.env.NODE_ENV !== "production") {
+        // Dev fallback for mock testing tokens
         req.user = {
-          id: payload.userId,
-          name: payload.username || payload.name,
-          email: payload.email,
-          country: payload.country || "United Kingdom",
+          id: "dev-mock-user-12345",
+          name: "Mock Dev Manager",
+          email: "dev@myco.io",
+          country: "United Kingdom",
         };
+      } else {
+        // Validate signed HS256 JWT with partner secret key
+        const payload = verifyJwt(token, partner.id);
+        if (payload) {
+          // Verify claim matches current tenant partner subdomain if specified
+          if (payload.subdomain && payload.subdomain !== partner.subdomain) {
+            console.warn(`JWT Subdomain mismatch: payload '${payload.subdomain}' !== tenant '${partner.subdomain}'`);
+          } else {
+            req.user = {
+              id: payload.userId || payload.id,
+              name: payload.username || payload.name || "Fantasy Manager",
+              email: payload.email || "",
+              country: payload.country || "United Kingdom",
+            };
+          }
+        }
       }
     }
 

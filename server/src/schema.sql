@@ -90,8 +90,19 @@ CREATE TABLE IF NOT EXISTS tournaments (
   status TEXT NOT NULL DEFAULT 'Active',
   api_league_id INTEGER,
   api_season INTEGER,
+  splash_title TEXT DEFAULT '',
+  logo_url TEXT DEFAULT '',
+  primary_color TEXT DEFAULT '#00E676',
+  secondary_color TEXT DEFAULT '#00C965',
+  accent_color TEXT DEFAULT '#00E676',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS splash_title TEXT DEFAULT '';
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS logo_url TEXT DEFAULT '';
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS primary_color TEXT DEFAULT '#00E676';
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS secondary_color TEXT DEFAULT '#00C965';
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS accent_color TEXT DEFAULT '#00E676';
 
 CREATE TABLE IF NOT EXISTS players (
   tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,

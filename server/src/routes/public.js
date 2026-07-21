@@ -32,6 +32,21 @@ function serializePlayer(p) {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// XSS Sanitization helper for user inputs (e.g. teamName)
+function sanitizeInput(str) {
+  if (typeof str !== "string") return "";
+  return str
+    .replace(/<[^>]*>?/gm, "")
+    .replace(/[&<>"']/g, (m) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#x27;"
+    }[m]))
+    .trim();
+}
+
 // 1. Get Players catalog
 router.get("/players", async (req, res) => {
   const tournamentId = req.query.tournament;
@@ -287,6 +302,9 @@ router.post("/squad", requireUserAuth, async (req, res) => {
 
     const chipsUsed = [...new Set([...pastChipsUsed, ...(currentActiveChip ? [currentActiveChip] : [])])];
 
+    const sanitizedTeamName = sanitizeInput(teamName || "");
+    const sanitizedUserName = sanitizeInput(userName || "Manager");
+
     // Insert or update user squad
     const { rows } = await pool.query(
       `INSERT INTO user_squads (partner_id, user_identifier, tournament_id, player_ids, captain_id, bank_remaining, team_name, country, user_name, chips_used, active_chip, updated_at)
@@ -310,9 +328,9 @@ router.post("/squad", requireUserAuth, async (req, res) => {
         JSON.stringify(playerIds),
         captainId || null,
         bankRemaining,
-        teamName || "",
-        country || "",
-        userName,
+        sanitizedTeamName,
+        country || req.user.country || "United Kingdom",
+        sanitizedUserName,
         JSON.stringify(chipsUsed),
         currentActiveChip
       ]
@@ -467,11 +485,17 @@ router.get("/tournaments", async (req, res) => {
     const { rows } = await pool.query(
       `SELECT 
          t.*, 
+         p.name as partner_name,
+         p.logo as partner_logo,
+         p.primary_color as partner_primary_color,
+         p.secondary_color as partner_secondary_color,
+         p.subdomain as partner_subdomain,
          s.name as sport_name, 
          s.squad_size, 
          s.positions as sport_positions, 
          s.default_scoring as sport_default_scoring
        FROM tournaments t
+       JOIN partners p ON t.partner_id = p.id
        JOIN sports_config s ON t.sport_key = s.key
        WHERE t.partner_id = $1 AND t.status = 'Active' 
        ORDER BY t.created_at DESC`,

@@ -193,16 +193,43 @@ router.get("/:id/tournaments", async (req, res) => {
 });
 
 router.post("/:id/tournaments", async (req, res) => {
-  const { name, sportKey, status, apiLeagueId, apiSeason } = req.body || {};
+  const { 
+    name, 
+    sportKey, 
+    status, 
+    apiLeagueId, 
+    apiSeason,
+    splashTitle,
+    logoUrl,
+    primaryColor,
+    secondaryColor,
+    accentColor
+  } = req.body || {};
+  
   if (!name || !sportKey) {
     return res.status(400).json({ error: "name and sportKey are required" });
   }
   try {
     const { rows } = await pool.query(
-      `INSERT INTO tournaments (partner_id, name, sport_key, status, api_league_id, api_season)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO tournaments (
+         partner_id, name, sport_key, status, api_league_id, api_season, 
+         splash_title, logo_url, primary_color, secondary_color, accent_color
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [req.params.id, name, sportKey, status || "Active", apiLeagueId || null, apiSeason || null]
+      [
+        req.params.id, 
+        name, 
+        sportKey, 
+        status || "Active", 
+        apiLeagueId || null, 
+        apiSeason || null,
+        splashTitle || "",
+        logoUrl || "",
+        primaryColor || "#00E676",
+        secondaryColor || "#00C965",
+        accentColor || primaryColor || "#00E676"
+      ]
     );
     
     // Update partner live_tournaments count

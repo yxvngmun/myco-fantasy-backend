@@ -62,7 +62,7 @@ router.post("/invite", async (req, res) => {
       html: `
         <h2>Welcome to Fantasy Partner Network</h2>
         <p>Dear ${name} Team,</p>
-        <p>You have been invited by SuperAdmin to launch your white-label fantasy platform on <strong>${subdomain}.mycofantasy.local</strong>.</p>
+        <p>You have been invited by SuperAdmin to launch your white-label fantasy platform on <strong>${subdomain}.myco.io</strong>.</p>
         <p>Please click the button below to complete your 2-Step KYC Registration:</p>
         <p><a href="${registerUrl}" style="background:#00E676;color:#07110C;padding:12px 24px;text-decoration:none;font-weight:bold;border-radius:6px;display:inline-block;">Complete 2-Step Registration</a></p>
         <p>Direct Link: <a href="${registerUrl}">${registerUrl}</a></p>

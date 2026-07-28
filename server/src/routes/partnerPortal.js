@@ -974,13 +974,13 @@ router.post("/:subdomain/tournaments", async (req, res) => {
     // Replicate SDK config registration if status is Active
     if (status === "Active") {
       const configData = {
-        tournamentName: name,
-        source: apiLeagueId ? (apiLeagueId === 39 ? "epl" : apiLeagueId === 2 ? "ucl" : apiLeagueId === 1 ? "wc" : "static") : "static",
-        budgetCap: 100,
+        tournamentName: tournament.name,
+        source: tournament.api_league_id ? (tournament.api_league_id === 39 ? "epl" : tournament.api_league_id === 2 ? "ucl" : tournament.api_league_id === 1 ? "wc" : "static") : "static",
+        budgetCap: tournament.team_budget !== undefined ? Number(tournament.team_budget) : 100,
         squadSize: 11,
-        transfersPerMatch: 1,
-        captainMultiplier: 2,
-        scoringMatrix: scoringRules || [],
+        transfersPerMatch: tournament.transfers_per_match !== undefined ? Number(tournament.transfers_per_match) : 2,
+        captainMultiplier: tournament.captain_vice_captain ? 2 : 1,
+        scoringMatrix: tournament.scoring_rules || [],
       };
 
       const sdkToken = `sdk_${subdomain}_${sportKey}_${Date.now()}`;
@@ -1084,10 +1084,10 @@ router.patch("/:subdomain/tournaments/:id", async (req, res) => {
       const configData = {
         tournamentName: tournament.name,
         source: tournament.api_league_id ? (tournament.api_league_id === 39 ? "epl" : tournament.api_league_id === 2 ? "ucl" : tournament.api_league_id === 1 ? "wc" : "static") : "static",
-        budgetCap: 100,
+        budgetCap: tournament.team_budget !== undefined ? Number(tournament.team_budget) : 100,
         squadSize: 11,
-        transfersPerMatch: 1,
-        captainMultiplier: 2,
+        transfersPerMatch: tournament.transfers_per_match !== undefined ? Number(tournament.transfers_per_match) : 2,
+        captainMultiplier: tournament.captain_vice_captain ? 2 : 1,
         scoringMatrix: tournament.scoring_rules || [],
       };
 

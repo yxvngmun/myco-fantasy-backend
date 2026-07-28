@@ -11,6 +11,7 @@ import sportsRoutes from "./routes/sports.js";
 import settingsRoutes from "./routes/settings.js";
 import billingRoutes from "./routes/billing.js";
 import publicRoutes from "./routes/public.js";
+import partnerPortalRoutes from "./routes/partnerPortal.js";
 
 const PgSession = connectPgSimple(session);
 
@@ -38,7 +39,25 @@ export function createApp() {
             "https://myco.io",
             "https://*.myco.io",
             "http://localhost:*",
-            "http://127.0.0.1:*"
+            "http://127.0.0.1:*",
+            "http://192.168.*:*",
+            "http://10.*:*",
+            "http://172.16.*:*",
+            "http://172.17.*:*",
+            "http://172.18.*:*",
+            "http://172.19.*:*",
+            "http://172.20.*:*",
+            "http://172.21.*:*",
+            "http://172.22.*:*",
+            "http://172.23.*:*",
+            "http://172.24.*:*",
+            "http://172.25.*:*",
+            "http://172.26.*:*",
+            "http://172.27.*:*",
+            "http://172.28.*:*",
+            "http://172.29.*:*",
+            "http://172.30.*:*",
+            "http://172.31.*:*"
           ]
         }
       },
@@ -67,7 +86,8 @@ export function createApp() {
         const isAllowed = allowedOrigins.includes(origin) ||
           origin.endsWith(".vercel.app") ||
           /^https?:\/\/localhost:\d+$/.test(origin) ||
-          /^https?:\/\/127\.0\.0\.1:\d+$/.test(origin);
+          /^https?:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
+          /^https?:\/\/(?:192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+):\d+$/.test(origin);
 
         if (isAllowed) {
           callback(null, true);
@@ -78,7 +98,9 @@ export function createApp() {
       credentials: true,
     })
   );
-  app.use(express.json());
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use("/kyc", express.static("public/kyc"));
 
   app.use(
     session({
@@ -100,6 +122,7 @@ export function createApp() {
   app.use("/api/sports", sportsRoutes);
   app.use("/api/settings", settingsRoutes);
   app.use("/api/billing", billingRoutes);
+  app.use("/api/partner-portal", partnerPortalRoutes);
   app.use("/api/public", publicApiLimiter, publicRoutes);
 
   // Run lightweight data patch on startup to zero out unplayed Round 4 stats in DB

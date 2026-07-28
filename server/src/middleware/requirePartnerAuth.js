@@ -2,7 +2,7 @@ import { pool } from "../db.js";
 import { verifyJwt } from "../lib/jwt.js";
 
 export async function requirePartnerAuth(req, res, next) {
-  const subdomain = req.headers["x-partner-subdomain"] || req.query.subdomain || "copa-media";
+  const subdomain = req.headers["x-partner-subdomain"] || req.query.subdomain || "footypool";
 
   try {
     // 1. Fetch partner to ensure they exist, are Active, and to get their ID as the JWT secret
@@ -61,6 +61,24 @@ export async function requirePartnerAuth(req, res, next) {
             };
           }
         }
+      }
+    }
+
+    if (req.user) {
+      try {
+        await pool.query(
+          `INSERT INTO partner_users (partner_id, user_identifier, name, email, country, last_active_at)
+           VALUES ($1, $2, $3, $4, $5, now())
+           ON CONFLICT (partner_id, user_identifier)
+           DO UPDATE SET
+             name = COALESCE(NULLIF(EXCLUDED.name, ''), partner_users.name),
+             email = COALESCE(NULLIF(EXCLUDED.email, ''), partner_users.email),
+             country = COALESCE(NULLIF(EXCLUDED.country, ''), partner_users.country),
+             last_active_at = now()`,
+          [partner.id, req.user.id, req.user.name, req.user.email, req.user.country]
+        );
+      } catch (syncErr) {
+        console.warn("Failed to sync partner user in middleware:", syncErr.message);
       }
     }
 

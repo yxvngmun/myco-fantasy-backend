@@ -2,6 +2,10 @@ import { Router } from "express";
 import { pool } from "../db.js";
 import { sendEmail } from "../lib/email.js";
 import { toCsv } from "../lib/csv.js";
+import fs from "fs";
+import path from "path";
+import bcrypt from "bcryptjs";
+import { syncTournamentData } from "../lib/sync.js";
 
 const router = Router();
 
@@ -29,10 +33,14 @@ router.post("/invite", async (req, res) => {
   }
 
   try {
-    // Check if subdomain is already taken
-    const existing = await pool.query("SELECT id FROM partners WHERE subdomain = $1", [subdomain]);
+    // Check if subdomain is already taken and active
+    const existing = await pool.query("SELECT id, status FROM partners WHERE subdomain = $1", [subdomain]);
     if (existing.rows.length > 0) {
-      return res.status(409).json({ error: `Subdomain '${subdomain}' is already registered.` });
+      if (existing.rows[0].status === 'Active') {
+        return res.status(409).json({ error: `Subdomain '${subdomain}' is already registered and active.` });
+      }
+      // Set existing partner status to Pending so it shows up correctly in the UI
+      await pool.query("UPDATE partners SET status = 'Pending' WHERE subdomain = $1", [subdomain]);
     }
 
     const token = generateToken();
@@ -44,7 +52,7 @@ router.post("/invite", async (req, res) => {
     );
 
     const invite = rows[0];
-    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || "http://localhost:5174";
+    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || "http://localhost:5175";
     const registerUrl = `${partnerPortalUrl}/register?token=${token}`;
 
     // Dispatch Onboarding Email
@@ -165,7 +173,7 @@ router.post("/register-step1", async (req, res) => {
  * Step 2: Upload Softcopy of Signed KYC / Master Service Agreement (PDF/JPEG)
  */
 router.post("/register-step2-kyc", async (req, res) => {
-  const { token, kycDocumentUrl } = req.body || {};
+  const { token, kycDocumentUrl, kycDocumentName } = req.body || {};
   if (!token || !kycDocumentUrl) {
     return res.status(400).json({ error: "Invite token and KYC document softcopy attachment are required." });
   }
@@ -180,6 +188,29 @@ router.post("/register-step2-kyc", async (req, res) => {
     }
     const invite = inviteRes.rows[0];
 
+    // Process base64 file data if present
+    let finalKycUrl = kycDocumentUrl;
+    if (kycDocumentUrl.startsWith("data:")) {
+      const matches = kycDocumentUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const kycDir = path.resolve("public/kyc");
+        if (!fs.existsSync(kycDir)) {
+          fs.mkdirSync(kycDir, { recursive: true });
+        }
+        const fileBuffer = Buffer.from(matches[2], "base64");
+        // Sanitize the filename to prevent directory traversal
+        const cleanName = (kycDocumentName || "kyc_document.pdf").replace(/[^a-zA-Z0-9.\-_]/g, "_");
+        const uniqueName = `${Date.now()}_${cleanName}`;
+        const filePath = path.join(kycDir, uniqueName);
+        fs.writeFileSync(filePath, fileBuffer);
+        
+        // Dynamically resolve protocol and host for local or production/cloud environments
+        const host = req.get("host") || "localhost:4000";
+        const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
+        finalKycUrl = `${protocol}://${host}/kyc/${uniqueName}`;
+      }
+    }
+
     // Update partner status to 'Pending KYC Approval'
     const { rows } = await pool.query(
       `UPDATE partners SET
@@ -188,7 +219,7 @@ router.post("/register-step2-kyc", async (req, res) => {
          status = 'Pending KYC Approval'
        WHERE subdomain = $2
        RETURNING *`,
-      [kycDocumentUrl, invite.subdomain]
+      [finalKycUrl, invite.subdomain]
     );
 
     if (rows.length === 0) {
@@ -215,9 +246,13 @@ router.post("/:id/approve-kyc", async (req, res) => {
   const { id } = req.params;
 
   try {
+    // Generate secure temporary password
+    const tempPassword = "FP_" + Math.random().toString(36).slice(-6).toUpperCase();
+    const hash = await bcrypt.hash(tempPassword, 10);
+
     const { rows } = await pool.query(
-      `UPDATE partners SET status = 'Active' WHERE id = $1 RETURNING *`,
-      [id]
+      `UPDATE partners SET status = 'Active', password_hash = $1 WHERE id = $2 RETURNING *`,
+      [hash, id]
     );
 
     if (rows.length === 0) {
@@ -225,10 +260,10 @@ router.post("/:id/approve-kyc", async (req, res) => {
     }
 
     const partner = rows[0];
-    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || "http://localhost:5174";
-    const portalUrl = `${partnerPortalUrl}/portal?subdomain=${partner.subdomain}`;
+    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || "http://localhost:5175";
+    const portalUrl = `${partnerPortalUrl}/?subdomain=${partner.subdomain}`;
 
-    // Dispatch Activation Confirmation Email
+    // Dispatch Activation Confirmation Email with Login Credentials
     await sendEmail({
       to: partner.email,
       subject: `Your Partner Portal is Active! - ${partner.name}`,
@@ -236,11 +271,16 @@ router.post("/:id/approve-kyc", async (req, res) => {
         <h2>Congratulations! Your Partner Portal is Approved & Active</h2>
         <p>Dear ${partner.contact_name || partner.name},</p>
         <p>Your signed KYC and Master Service Agreement have been reviewed and approved by SuperAdmin.</p>
-        <p>You can now log in and access your Partner Admin Portal at:</p>
+        <p>You can now log in and access your Partner Admin Portal using the details below:</p>
+        <div style="background:#161D29;color:#fff;padding:16px;border-radius:6px;margin:16px 0;border:1px solid rgba(255,255,255,0.1)">
+          <strong>Login Link:</strong> <a href="${portalUrl}" style="color:#00E676">${portalUrl}</a><br />
+          <strong>Username / Email:</strong> ${partner.email}<br />
+          <strong>Temporary Password:</strong> <code style="background:#0F141C;padding:4px 8px;border-radius:4px;color:#FFD54F">${tempPassword}</code>
+        </div>
+        <p>Please change your password immediately after logging in for security.</p>
         <p><a href="${portalUrl}" style="background:#00E676;color:#07110C;padding:12px 24px;text-decoration:none;font-weight:bold;border-radius:6px;display:inline-block;">Access Partner Portal</a></p>
-        <p>Direct Link: <a href="${portalUrl}">${portalUrl}</a></p>
       `,
-      text: `Your Partner Portal is approved! Access at: ${portalUrl}`,
+      text: `Your Partner Portal is approved! Access at: ${portalUrl}. Username: ${partner.email}, Temp Password: ${tempPassword}`,
     });
 
     res.json({ message: "Partner KYC approved and activation email dispatched.", partner });
@@ -309,6 +349,53 @@ router.post("/:id/assign-sport", async (req, res) => {
 // ----------------------------------------------------
 // 3. MODULE 2: PARTNER PORTAL PRD ENDPOINTS (6.1 - 6.6)
 // ----------------------------------------------------
+
+/**
+ * Public endpoint to fetch partner branding info (logo, colors) for login screen
+ */
+router.get("/:subdomain/public-branding", async (req, res) => {
+  const { subdomain } = req.params;
+  try {
+    const { rows } = await pool.query(
+      "SELECT name, logo, primary_color, secondary_color FROM partners WHERE subdomain = $1",
+      [subdomain]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Partner branding not found." });
+    }
+    
+    const partner = rows[0];
+    res.json({
+      name: partner.name,
+      logo: partner.logo,
+      primaryColor: partner.primary_color || "#00E676",
+      secondaryColor: partner.secondary_color || "#14b8a6",
+    });
+  } catch (err) {
+    console.error("Public branding fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch branding." });
+  }
+});
+
+// Middleware to verify partner portal session for dashboard routes
+router.use("/:subdomain", (req, res, next) => {
+  // Exclude auth and public branding routes
+  if (
+    req.path.startsWith("/auth/") || 
+    req.path.includes("/auth") || 
+    req.path === "/public-branding" ||
+    req.path.endsWith("/public-branding")
+  ) {
+    return next();
+  }
+  
+  const { subdomain } = req.params;
+  if (req.session && req.session.partnerId && req.session.partnerSubdomain === subdomain) {
+    return next();
+  }
+  
+  res.status(401).json({ error: "Session expired or unauthorized. Please log in." });
+});
 
 /**
  * 6.1 Partner Dashboard 8 Metrics
@@ -647,6 +734,385 @@ router.post("/:subdomain/withdrawals/:id/action", async (req, res) => {
   } catch (err) {
     console.error("Withdrawal action error:", err);
     res.status(500).json({ error: "Failed to update withdrawal status." });
+  }
+});
+
+/**
+ * Partner Authentication: Login
+ */
+router.post("/:subdomain/auth/login", async (req, res) => {
+  const { subdomain } = req.params;
+  const { email, password } = req.body || {};
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required." });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM partners WHERE subdomain = $1",
+      [subdomain]
+    );
+
+    const partner = rows[0];
+    if (!partner) {
+      return res.status(404).json({ error: "Partner not found." });
+    }
+
+    if (partner.status !== "Active") {
+      return res.status(403).json({ error: "Partner is not active yet." });
+    }
+
+    if (partner.email.toLowerCase() !== email.toLowerCase()) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    if (!partner.password_hash) {
+      return res.status(401).json({ error: "No password configured. Please contact support." });
+    }
+
+    const isValid = await bcrypt.compare(password, partner.password_hash);
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    req.session.partnerId = partner.id;
+    req.session.partnerSubdomain = subdomain;
+
+    res.json({ success: true, partner: { id: partner.id, name: partner.name, email: partner.email, subdomain } });
+  } catch (err) {
+    console.error("Partner login error:", err);
+    res.status(500).json({ error: "Failed to log in." });
+  }
+});
+
+/**
+ * Partner Authentication: Logout
+ */
+router.post("/:subdomain/auth/logout", async (req, res) => {
+  req.session.partnerId = null;
+  req.session.partnerSubdomain = null;
+  res.json({ success: true });
+});
+
+/**
+ * Partner Authentication: Session check
+ */
+router.get("/:subdomain/auth/session", async (req, res) => {
+  const { subdomain } = req.params;
+
+  if (req.session.partnerId && req.session.partnerSubdomain === subdomain) {
+    try {
+      const { rows } = await pool.query(
+        "SELECT id, name, email, subdomain, status FROM partners WHERE id = $1",
+        [req.session.partnerId]
+      );
+      if (rows.length > 0 && rows[0].status === "Active") {
+        return res.json({ loggedIn: true, partner: rows[0] });
+      }
+    } catch (err) {
+      console.error("Session check error:", err);
+    }
+  }
+
+  res.json({ loggedIn: false });
+});
+
+/**
+ * Partner Authentication: Change Password
+ */
+router.post("/:subdomain/auth/change-password", async (req, res) => {
+  const { subdomain } = req.params;
+  const { newPassword } = req.body || {};
+
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: "New password must be at least 6 characters long." });
+  }
+
+  if (req.session.partnerId && req.session.partnerSubdomain === subdomain) {
+    try {
+      const newHash = await bcrypt.hash(newPassword, 10);
+      await pool.query(
+        "UPDATE partners SET password_hash = $1 WHERE id = $2",
+        [newHash, req.session.partnerId]
+      );
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("Change password error:", err);
+      return res.status(500).json({ error: "Failed to change password." });
+    }
+  }
+
+  res.status(401).json({ error: "Unauthorized" });
+});
+
+/**
+ * 6.7 Partner Tournament Management (List, Config, Create & Update)
+ */
+router.get("/:subdomain/sports-config", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM sports_config WHERE status = 'Active' ORDER BY name");
+    res.json(rows.map(row => ({
+      key: row.key,
+      name: row.name,
+      status: row.status,
+      ruleProfile: row.rule_profile,
+      dataProvider: row.data_provider,
+      squadSize: row.squad_size,
+      positions: row.positions,
+      defaultScoring: row.default_scoring,
+      tournamentTypes: row.tournament_types,
+    })));
+  } catch (err) {
+    console.error("Get sports config error:", err);
+    res.status(500).json({ error: "Failed to fetch sports config." });
+  }
+});
+
+router.get("/:subdomain/tournaments", async (req, res) => {
+  const { subdomain } = req.params;
+  try {
+    const partnerRes = await pool.query("SELECT id FROM partners WHERE subdomain = $1", [subdomain]);
+    if (partnerRes.rows.length === 0) return res.status(404).json({ error: "Partner not found" });
+    const partnerId = partnerRes.rows[0].id;
+
+    const { rows } = await pool.query(
+      `SELECT t.*, 
+              s.name as sport_name, 
+              s.squad_size, 
+              s.positions as sport_positions, 
+              s.default_scoring as sport_default_scoring
+       FROM tournaments t
+       JOIN sports_config s ON t.sport_key = s.key
+       WHERE t.partner_id = $1 
+       ORDER BY t.created_at DESC`,
+      [partnerId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Fetch tournaments error:", err);
+    res.status(500).json({ error: "Failed to fetch tournaments." });
+  }
+});
+
+router.post("/:subdomain/tournaments", async (req, res) => {
+  const { subdomain } = req.params;
+  const {
+    name,
+    sportKey,
+    status,
+    apiLeagueId,
+    apiSeason,
+    splashTitle,
+    logoUrl,
+    primaryColor,
+    secondaryColor,
+    accentColor,
+    scoringRules,
+    tournamentType,
+    startDate,
+    endDate,
+    teamBudget,
+    formation,
+    substitutesAllowed,
+    transfersPerMatch,
+    captainViceCaptain,
+  } = req.body || {};
+
+  if (!name || !sportKey) {
+    return res.status(400).json({ error: "name and sportKey are required" });
+  }
+
+  try {
+    const partnerRes = await pool.query("SELECT id, name FROM partners WHERE subdomain = $1", [subdomain]);
+    if (partnerRes.rows.length === 0) return res.status(404).json({ error: "Partner not found" });
+    const partner = partnerRes.rows[0];
+
+    // Insert tournament
+    const { rows } = await pool.query(
+      `INSERT INTO tournaments (
+         partner_id, name, sport_key, status, api_league_id, api_season, 
+         splash_title, logo_url, primary_color, secondary_color, accent_color, scoring_rules,
+         tournament_type, start_date, end_date, team_budget, formation, substitutes_allowed,
+         transfers_per_match, captain_vice_captain
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+       RETURNING *`,
+      [
+        partner.id,
+        name,
+        sportKey,
+        status || "Active",
+        apiLeagueId || null,
+        apiSeason || null,
+        splashTitle || `${partner.name} Fantasy`,
+        logoUrl || "",
+        primaryColor || "#00E676",
+        secondaryColor || "#00C965",
+        accentColor || primaryColor || "#00E676",
+        JSON.stringify(scoringRules || []),
+        tournamentType || "Season-Long",
+        startDate || new Date(),
+        endDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        teamBudget !== undefined ? Number(teamBudget) : 100,
+        JSON.stringify(formation || {}),
+        substitutesAllowed !== undefined ? Number(substitutesAllowed) : 4,
+        transfersPerMatch !== undefined ? Number(transfersPerMatch) : 2,
+        captainViceCaptain !== undefined ? Boolean(captainViceCaptain) : true,
+      ]
+    );
+
+    const tournament = rows[0];
+
+    // Update live_tournaments count on partner
+    await pool.query(
+      "UPDATE partners SET live_tournaments = (SELECT COUNT(*) FROM tournaments WHERE partner_id = $1 AND status = 'Active') WHERE id = $1",
+      [partner.id]
+    );
+
+    // Replicate SDK config registration if status is Active
+    if (status === "Active") {
+      const configData = {
+        tournamentName: name,
+        source: apiLeagueId ? (apiLeagueId === 39 ? "epl" : apiLeagueId === 2 ? "ucl" : apiLeagueId === 1 ? "wc" : "static") : "static",
+        budgetCap: 100,
+        squadSize: 11,
+        transfersPerMatch: 1,
+        captainMultiplier: 2,
+        scoringMatrix: scoringRules || [],
+      };
+
+      const sdkToken = `sdk_${subdomain}_${sportKey}_${Date.now()}`;
+
+      await pool.query(
+        `INSERT INTO partner_sports_sdk (partner_id, sport_key, sdk_token, status, configuration, tournament_id)
+         VALUES ($1, $2, $3, 'PUBLISHED', $4, $5)
+         ON CONFLICT (partner_id, sport_key)
+         DO UPDATE SET status = 'PUBLISHED', configuration = EXCLUDED.configuration, tournament_id = EXCLUDED.tournament_id, updated_at = now()`,
+        [partner.id, sportKey, sdkToken, JSON.stringify(configData), tournament.id]
+      );
+    }
+
+    // Trigger sync in background
+    syncTournamentData(tournament.id, apiLeagueId, apiSeason).catch((err) => {
+      console.error(`[Background Sync Error] for tournament ${tournament.id}:`, err.message || err);
+    });
+
+    res.status(201).json(tournament);
+  } catch (err) {
+    console.error("Create tournament error:", err);
+    res.status(500).json({ error: "Failed to create tournament." });
+  }
+});
+
+router.patch("/:subdomain/tournaments/:id", async (req, res) => {
+  const { subdomain, id } = req.params;
+  const b = req.body || {};
+
+  try {
+    const partnerRes = await pool.query("SELECT id, name FROM partners WHERE subdomain = $1", [subdomain]);
+    if (partnerRes.rows.length === 0) return res.status(404).json({ error: "Partner not found" });
+    const partner = partnerRes.rows[0];
+
+    // Check if tournament exists
+    const checkRes = await pool.query(
+      "SELECT * FROM tournaments WHERE id = $1 AND partner_id = $2",
+      [id, partner.id]
+    );
+    if (checkRes.rows.length === 0) return res.status(404).json({ error: "Tournament not found" });
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    const fieldMap = {
+      name: "name",
+      status: "status",
+      apiLeagueId: "api_league_id",
+      apiSeason: "api_season",
+      splashTitle: "splash_title",
+      logoUrl: "logo_url",
+      primaryColor: "primary_color",
+      secondaryColor: "secondary_color",
+      accentColor: "accent_color",
+      scoringRules: "scoring_rules",
+      tournamentType: "tournament_type",
+      startDate: "start_date",
+      endDate: "end_date",
+      teamBudget: "team_budget",
+      formation: "formation",
+      substitutesAllowed: "substitutes_allowed",
+      transfersPerMatch: "transfers_per_match",
+      captainViceCaptain: "captain_vice_captain",
+    };
+
+    for (const [reqKey, dbCol] of Object.entries(fieldMap)) {
+      if (reqKey in b) {
+        updates.push(`${dbCol} = $${idx++}`);
+        let val = b[reqKey];
+        if (reqKey === "scoringRules" || reqKey === "formation") {
+          val = JSON.stringify(val);
+        }
+        values.push(val);
+      }
+    }
+
+    if (updates.length > 0) {
+      values.push(id);
+      values.push(partner.id);
+      await pool.query(
+        `UPDATE tournaments 
+         SET ${updates.join(", ")}, created_at = created_at
+         WHERE id = $${idx} AND partner_id = $${idx + 1}`,
+        values
+      );
+    }
+
+    // Fetch updated tournament
+    const updatedRes = await pool.query("SELECT * FROM tournaments WHERE id = $1", [id]);
+    const tournament = updatedRes.rows[0];
+
+    // Update live_tournaments count on partner
+    await pool.query(
+      "UPDATE partners SET live_tournaments = (SELECT COUNT(*) FROM tournaments WHERE partner_id = $1 AND status = 'Active') WHERE id = $1",
+      [partner.id]
+    );
+
+    // Replicate SDK config registration if status changes to Active or is Active
+    if (tournament.status === "Active") {
+      const configData = {
+        tournamentName: tournament.name,
+        source: tournament.api_league_id ? (tournament.api_league_id === 39 ? "epl" : tournament.api_league_id === 2 ? "ucl" : tournament.api_league_id === 1 ? "wc" : "static") : "static",
+        budgetCap: 100,
+        squadSize: 11,
+        transfersPerMatch: 1,
+        captainMultiplier: 2,
+        scoringMatrix: tournament.scoring_rules || [],
+      };
+
+      const sdkToken = `sdk_${subdomain}_${tournament.sport_key}_${Date.now()}`;
+
+      await pool.query(
+        `INSERT INTO partner_sports_sdk (partner_id, sport_key, sdk_token, status, configuration, tournament_id)
+         VALUES ($1, $2, $3, 'PUBLISHED', $4, $5)
+         ON CONFLICT (partner_id, sport_key)
+         DO UPDATE SET status = 'PUBLISHED', configuration = EXCLUDED.configuration, tournament_id = EXCLUDED.tournament_id, updated_at = now()`,
+        [partner.id, tournament.sport_key, sdkToken, JSON.stringify(configData), tournament.id]
+      );
+    }
+
+    // Trigger sync if league or season changed
+    if (b.apiLeagueId !== undefined || b.apiSeason !== undefined) {
+      syncTournamentData(tournament.id, tournament.api_league_id, tournament.api_season).catch((err) => {
+        console.error(`[Background Sync Error] for tournament ${tournament.id}:`, err.message || err);
+      });
+    }
+
+    res.json(tournament);
+  } catch (err) {
+    console.error("Update tournament error:", err);
+    res.status(500).json({ error: "Failed to update tournament." });
   }
 });
 

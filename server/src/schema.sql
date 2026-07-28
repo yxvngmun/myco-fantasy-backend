@@ -103,6 +103,16 @@ ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS logo_url TEXT DEFAULT '';
 ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS primary_color TEXT DEFAULT '#00E676';
 ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS secondary_color TEXT DEFAULT '#00C965';
 ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS accent_color TEXT DEFAULT '#00E676';
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS scoring_rules JSONB DEFAULT '[]';
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS tournament_type TEXT DEFAULT 'Season-Long';
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS start_date TIMESTAMPTZ DEFAULT now();
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS end_date TIMESTAMPTZ DEFAULT (now() + interval '90 days');
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS team_budget NUMERIC DEFAULT 100;
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS formation JSONB DEFAULT '{}';
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS substitutes_allowed INTEGER DEFAULT 4;
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS transfers_per_match INTEGER DEFAULT 2;
+ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS captain_vice_captain BOOLEAN DEFAULT true;
+
 
 CREATE TABLE IF NOT EXISTS players (
   tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
@@ -187,8 +197,92 @@ WHERE a.id > b.id
   AND a.home_name = b.home_name 
   AND a.away_name = b.away_name;
 
--- Add unique constraint
-ALTER TABLE fixtures ADD CONSTRAINT unique_tournament_fixture UNIQUE (tournament_id, round, home_name, away_name);
+-- Add new partner columns
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS kyc_document_url TEXT DEFAULT '';
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS kyc_submitted_at TIMESTAMPTZ;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS legal_company_name TEXT DEFAULT '';
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS tax_id TEXT DEFAULT '';
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS favicon_url TEXT DEFAULT '';
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS welcome_message TEXT DEFAULT '';
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS support_email TEXT DEFAULT '';
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS terms_content TEXT DEFAULT '';
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS privacy_content TEXT DEFAULT '';
+
+-- Partner Invites Table
+CREATE TABLE IF NOT EXISTS partner_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  subdomain TEXT NOT NULL,
+  commission NUMERIC NOT NULL DEFAULT 15,
+  monthly_fee NUMERIC NOT NULL DEFAULT 0,
+  invite_token TEXT UNIQUE NOT NULL,
+  status TEXT NOT NULL DEFAULT 'Pending',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '7 days')
+);
+
+-- Contests Table
+CREATE TABLE IF NOT EXISTS contests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  tournament_id UUID REFERENCES tournaments(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'Practice',
+  entry_fee NUMERIC NOT NULL DEFAULT 0,
+  max_entries INTEGER NOT NULL DEFAULT 100,
+  current_entries INTEGER NOT NULL DEFAULT 0,
+  prize_pool NUMERIC NOT NULL DEFAULT 0,
+  winner_distribution JSONB NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'Upcoming',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Partner Registered Users Table
+CREATE TABLE IF NOT EXISTS partner_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  user_identifier TEXT NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT DEFAULT '',
+  country TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'Active',
+  total_contests_joined INTEGER NOT NULL DEFAULT 0,
+  total_spent NUMERIC NOT NULL DEFAULT 0,
+  total_winnings NUMERIC NOT NULL DEFAULT 0,
+  registered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_active_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT unique_partner_user UNIQUE (partner_id, user_identifier)
+);
+
+-- Financial Transactions Ledger Table
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  user_identifier TEXT NOT NULL,
+  user_name TEXT DEFAULT '',
+  type TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  status TEXT NOT NULL DEFAULT 'Completed',
+  reference TEXT DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Single SDK Runtime Status Table
+CREATE TABLE IF NOT EXISTS partner_sports_sdk (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  sport_key TEXT NOT NULL REFERENCES sports_config(key),
+  sdk_token TEXT UNIQUE NOT NULL,
+  status TEXT NOT NULL DEFAULT 'UNCONFIGURED',
+  configuration JSONB DEFAULT '{}',
+  tournament_id UUID REFERENCES tournaments(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT unique_partner_sport UNIQUE (partner_id, sport_key)
+);
+
 
 
 

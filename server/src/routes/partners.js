@@ -33,6 +33,18 @@ function serialize(row) {
     liveTournaments: row.live_tournaments,
     lastActivityAt: row.last_activity_at,
     createdAt: row.created_at,
+    
+    // KYC and Registration Details
+    kyc_document_url: row.kyc_document_url,
+    kycDocumentUrl: row.kyc_document_url,
+    kyc_submitted_at: row.kyc_submitted_at,
+    kycSubmittedAt: row.kyc_submitted_at,
+    legal_company_name: row.legal_company_name,
+    legalCompanyName: row.legal_company_name,
+    tax_id: row.tax_id,
+    taxId: row.tax_id,
+    support_email: row.support_email,
+    supportEmail: row.support_email,
   };
 }
 

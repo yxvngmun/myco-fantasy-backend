@@ -7,6 +7,57 @@ const router = Router();
 // All public routes require partner tenant verification (via subdomain)
 router.use(requirePartnerAuth);
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Middleware to verify that the requested tournament (and its associated sport config) are active
+router.use(async (req, res, next) => {
+  // Only apply to routes that take tournament parameter and are not the config/status/list routes
+  if (
+    req.path === "/sdk-status" || 
+    req.path === "/tournaments/configure" || 
+    req.path === "/tournaments"
+  ) {
+    return next();
+  }
+
+  const tournamentId = req.query.tournament || req.body.tournamentId || req.body.tournament;
+  if (!tournamentId) {
+    return next();
+  }
+
+  if (!UUID_REGEX.test(tournamentId)) {
+    return res.status(400).json({ error: "Invalid tournament ID format" });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT t.status as tourn_status, s.status as sport_status 
+       FROM tournaments t 
+       JOIN sports_config s ON t.sport_key = s.key 
+       WHERE t.id = $1`,
+      [tournamentId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Tournament or sport configuration not found" });
+    }
+
+    const { tourn_status, sport_status } = rows[0];
+    if (tourn_status !== "Active") {
+      return res.status(403).json({ error: `Tournament is not currently active` });
+    }
+
+    if (sport_status !== "Active") {
+      return res.status(403).json({ error: `The sport for this tournament is currently inactive` });
+    }
+
+    next();
+  } catch (err) {
+    console.error("Tournament verification middleware error:", err.message);
+    res.status(500).json({ error: "Failed to verify tournament status" });
+  }
+});
+
 // Deterministically generate randomized matchday metrics (goals, assists, mins, clean sheets, cards, saves)
 function generatePlayerGameweekStats(playerId, pos, gameweek) {
   // Round 4 (and beyond) has not started yet — return 0 points and 0 minutes
@@ -170,8 +221,6 @@ function serializePlayer(p) {
   };
 }
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 // XSS Sanitization helper for user inputs (e.g. teamName)
 function sanitizeInput(str) {
   if (typeof str !== "string") return "";
@@ -215,6 +264,18 @@ router.get("/players", async (req, res) => {
   }
 });
 
+// Deterministic fixture scores for completed matchdays 1, 2, 3
+function getDeterministicFixtureScore(homeCode, awayCode, roundStr) {
+  const roundNum = parseInt(roundStr.replace(/\D/g, "")) || 1;
+  if (roundNum >= 4) {
+    return { status: "NS", homeScore: null, awayScore: null };
+  }
+  const seed = (homeCode.charCodeAt(0) * 13 + awayCode.charCodeAt(0) * 17 + roundNum * 31) % 100;
+  const homeScore = (seed + roundNum * 3) % 4;
+  const awayScore = (seed + roundNum * 7) % 3;
+  return { status: "FT", homeScore, awayScore };
+}
+
 // 2. Get Fixtures schedule
 router.get("/fixtures", async (req, res) => {
   const tournamentId = req.query.tournament;
@@ -224,14 +285,20 @@ router.get("/fixtures", async (req, res) => {
   try {
     const { rows } = await pool.query("SELECT * FROM fixtures WHERE tournament_id = $1 ORDER BY event_date ASC", [tournamentId]);
     res.json(
-      rows.map((f) => ({
-        round: f.round,
-        date: f.event_date.toISOString(),
-        dateLabel: f.date_label,
-        home: { name: f.home_name, code: f.home_code, color: f.home_color },
-        away: { name: f.away_name, code: f.away_code, color: f.away_color },
-        status: f.status,
-      }))
+      rows.map((f) => {
+        const roundNum = parseInt(String(f.round).replace(/\D/g, "")) || 1;
+        const scoreInfo = getDeterministicFixtureScore(f.home_code, f.away_code, String(f.round));
+        return {
+          round: f.round,
+          date: f.event_date.toISOString(),
+          dateLabel: roundNum >= 4 ? "31 July 19:00" : f.date_label,
+          home: { name: f.home_name, code: f.home_code, color: f.home_color },
+          away: { name: f.away_name, code: f.away_code, color: f.away_color },
+          status: scoreInfo.status,
+          homeScore: scoreInfo.homeScore,
+          awayScore: scoreInfo.awayScore,
+        };
+      })
     );
   } catch (err) {
     console.error("GET /fixtures failed:", err.message);
@@ -493,6 +560,14 @@ router.post("/squad", requireUserAuth, async (req, res) => {
       [req.partner.id]
     );
 
+    // Update user's contests count in the partner_users table
+    await pool.query(
+      `UPDATE partner_users SET
+         total_contests_joined = (SELECT COUNT(DISTINCT tournament_id) FROM user_squads WHERE partner_id = $1 AND user_identifier = $2)
+       WHERE partner_id = $1 AND user_identifier = $2`,
+      [req.partner.id, req.user.id]
+    );
+
     res.json({
       success: true,
       squad: players.map(serializePlayer),
@@ -722,4 +797,169 @@ router.get("/tournaments", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/public/sdk-status
+ * Checks if SDK is UNCONFIGURED or PUBLISHED for the current partner tenant
+ */
+router.get("/sdk-status", async (req, res) => {
+  const { sportKey, sdkToken } = req.query;
+  const targetSport = sportKey || "football";
+
+  try {
+    let query = "SELECT * FROM partner_sports_sdk WHERE partner_id = $1";
+    let params = [req.partner.id];
+
+    if (sdkToken) {
+      query = "SELECT * FROM partner_sports_sdk WHERE sdk_token = $1";
+      params = [sdkToken];
+    } else {
+      query += " AND sport_key = $2";
+      params.push(targetSport);
+    }
+
+    const { rows } = await pool.query(query, params);
+    if (rows.length === 0) {
+      // Check if sport is Active
+      const sportCheck = await pool.query("SELECT status FROM sports_config WHERE key = $1", [targetSport]);
+      if (sportCheck.rows.length === 0 || sportCheck.rows[0].status !== "Active") {
+        return res.json({ status: "UNCONFIGURED", configuration: {}, tournamentId: null });
+      }
+
+      // Fallback: Check if there are active tournaments for this partner and sport
+      const tournRes = await pool.query(
+        "SELECT id FROM tournaments WHERE partner_id = $1 AND sport_key = $2 AND status = 'Active'",
+        [req.partner.id, targetSport]
+      );
+      if (tournRes.rows.length > 0) {
+        return res.json({
+          status: "PUBLISHED",
+          configuration: {},
+          tournamentId: tournRes.rows[0].id,
+          sdkToken: null,
+        });
+      }
+      return res.json({ status: "UNCONFIGURED", configuration: {}, tournamentId: null });
+    }
+
+    const sdkRow = rows[0];
+
+    // Check if the sport of this SDK is active
+    const sportCheck = await pool.query("SELECT status FROM sports_config WHERE key = $1", [sdkRow.sport_key]);
+    if (sportCheck.rows.length === 0 || sportCheck.rows[0].status !== "Active") {
+      return res.json({ status: "UNCONFIGURED", configuration: {}, tournamentId: null });
+    }
+
+    // Check if the tournament of this SDK is active
+    if (sdkRow.tournament_id) {
+      const tournCheck = await pool.query("SELECT status FROM tournaments WHERE id = $1", [sdkRow.tournament_id]);
+      if (tournCheck.rows.length === 0 || tournCheck.rows[0].status !== "Active") {
+        return res.json({ status: "UNCONFIGURED", configuration: {}, tournamentId: null });
+      }
+    }
+
+    res.json({
+      status: sdkRow.status,
+      configuration: sdkRow.configuration || {},
+      tournamentId: sdkRow.tournament_id,
+      sdkToken: sdkRow.sdk_token,
+    });
+  } catch (err) {
+    console.error("GET /sdk-status error:", err.message);
+    res.status(500).json({ error: "Failed to fetch SDK status" });
+  }
+});
+
+/**
+ * POST /api/public/tournaments/configure
+ * In-widget Tournament Configurator endpoint for runtime state transition (UNCONFIGURED -> PUBLISHED)
+ */
+router.post("/tournaments/configure", async (req, res) => {
+  const {
+    tournamentName,
+    sportKey,
+    source,
+    budgetCap,
+    squadSize,
+    transfersPerMatch,
+    captainMultiplier,
+    scoringMatrix,
+    splashTitle,
+  } = req.body || {};
+
+  const name = tournamentName || `${req.partner.name} Tournament`;
+  const sKey = sportKey || "football";
+
+  try {
+    let apiLeagueId = null;
+    let apiSeason = null;
+    if (source === "epl") {
+      apiLeagueId = 39;
+      apiSeason = 2026;
+    } else if (source === "ucl") {
+      apiLeagueId = 2;
+      apiSeason = 2026;
+    } else if (source === "wc") {
+      apiLeagueId = 1;
+      apiSeason = 2026;
+    }
+
+    // 1. Create or activate tournament
+    const tournRes = await pool.query(
+      `INSERT INTO tournaments (
+         partner_id, name, sport_key, status, api_league_id, api_season, splash_title
+       )
+       VALUES ($1, $2, $3, 'Active', $4, $5, $6)
+       RETURNING *`,
+      [
+        req.partner.id,
+        name,
+        sKey,
+        apiLeagueId,
+        apiSeason,
+        splashTitle || `${req.partner.name} Fantasy`,
+      ]
+    );
+
+    const tournament = tournRes.rows[0];
+
+    // 2. Update partner_sports_sdk status to PUBLISHED
+    const configData = {
+      tournamentName: name,
+      source: source || "static",
+      budgetCap: budgetCap || 100,
+      squadSize: squadSize || 11,
+      transfersPerMatch: transfersPerMatch || 1,
+      captainMultiplier: captainMultiplier || 2,
+      scoringMatrix: scoringMatrix || [],
+    };
+
+    const sdkToken = `sdk_${req.partner.subdomain}_${sKey}_${Date.now()}`;
+
+    await pool.query(
+      `INSERT INTO partner_sports_sdk (partner_id, sport_key, sdk_token, status, configuration, tournament_id)
+       VALUES ($1, $2, $3, 'PUBLISHED', $4, $5)
+       ON CONFLICT (partner_id, sport_key)
+       DO UPDATE SET status = 'PUBLISHED', configuration = EXCLUDED.configuration, tournament_id = EXCLUDED.tournament_id, updated_at = now()`,
+      [req.partner.id, sKey, sdkToken, JSON.stringify(configData), tournament.id]
+    );
+
+    // Update live_tournaments count on partner
+    await pool.query(
+      "UPDATE partners SET live_tournaments = (SELECT COUNT(*) FROM tournaments WHERE partner_id = $1 AND status = 'Active') WHERE id = $1",
+      [req.partner.id]
+    );
+
+    res.json({
+      success: true,
+      status: "PUBLISHED",
+      tournament,
+      configuration: configData,
+    });
+  } catch (err) {
+    console.error("POST /tournaments/configure error:", err.message);
+    res.status(500).json({ error: "Failed to save and publish tournament configuration." });
+  }
+});
+
 export default router;
+

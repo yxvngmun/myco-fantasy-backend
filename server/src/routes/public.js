@@ -398,6 +398,66 @@ router.get("/squad", requireUserAuth, async (req, res) => {
   }
 });
 
+// Get Another User's Squad by User Identifier (Public)
+router.get("/squads/:userIdentifier", async (req, res) => {
+  const { userIdentifier } = req.params;
+  const tournamentId = req.query.tournament;
+  if (!tournamentId || !UUID_REGEX.test(tournamentId)) {
+    return res.status(400).json({ error: "A valid UUID tournament parameter is required" });
+  }
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM user_squads WHERE partner_id = $1 AND user_identifier = $2 AND tournament_id = $3",
+      [req.partner.id, userIdentifier, tournamentId]
+    );
+
+    const squadRow = rows[0];
+    if (!squadRow) {
+      return res.status(404).json({ error: "User squad not found" });
+    }
+
+    const playerIds = squadRow.player_ids;
+    if (!playerIds || playerIds.length === 0) {
+      return res.json({ squad: [], bank: Number(squadRow.bank_remaining), captainId: squadRow.captain_id });
+    }
+
+    const { rows: players } = await pool.query(
+      "SELECT * FROM players WHERE tournament_id = $1 AND id = ANY($2)",
+      [tournamentId, playerIds]
+    );
+
+    let squadList = playerIds
+      .map((id) => players.find((p) => p.id === id))
+      .filter(Boolean);
+
+    squadList = ensureValidStartingXI(squadList);
+
+    const formattedSquad = squadList.map((p, index) => {
+      const playerObj = serializePlayer(p);
+      if (playerObj.id === squadRow.captain_id) {
+        playerObj.c = true;
+      }
+      playerObj.onPitch = index < 11; 
+      return playerObj;
+    });
+
+    res.json({
+      squad: formattedSquad,
+      bank: Number(squadRow.bank_remaining),
+      captainId: squadRow.captain_id,
+      teamName: squadRow.team_name,
+      country: squadRow.country || "United Kingdom",
+      userName: squadRow.user_name,
+      chipsUsed: squadRow.chips_used || [],
+      activeChip: squadRow.active_chip || null,
+    });
+  } catch (err) {
+    console.error("GET /squads/:userIdentifier failed:", err.message);
+    res.status(500).json({ error: "Failed to load user squad" });
+  }
+});
+
+
 // 4. Create / Update User Squad (Requires User Auth)
 router.post("/squad", requireUserAuth, async (req, res) => {
   const { playerIds, captainId, tournamentId, teamName, country, activeChip } = req.body || {};

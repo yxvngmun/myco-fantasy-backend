@@ -23,6 +23,10 @@ function getAllowedOrigins() {
 export function createApp() {
   const app = express();
 
+  if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+  }
+
   // 1. Helmet Security Headers with Frame Ancestors CSP for OTT Embedding (myco.io)
   app.use(
     helmet({
@@ -65,10 +69,11 @@ export function createApp() {
     })
   );
 
-  // 2. Rate Limiting for Public Endpoints (120 requests per minute per IP)
+  // 2. Rate Limiting for Public Endpoints (120 requests per minute per IP, relaxed in dev)
+  const isDev = process.env.NODE_ENV === "development" || !process.env.NODE_ENV;
   const publicApiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
-    max: 120,
+    max: isDev ? 10000 : 120,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many requests from this IP, please try again later." }
@@ -111,7 +116,7 @@ export function createApp() {
       cookie: {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7,
       },
     })

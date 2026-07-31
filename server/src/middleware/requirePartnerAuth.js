@@ -2,7 +2,10 @@ import { pool } from "../db.js";
 import { verifyJwt } from "../lib/jwt.js";
 
 export async function requirePartnerAuth(req, res, next) {
-  const subdomain = req.headers["x-partner-subdomain"] || req.query.subdomain || "footypool";
+  let subdomain = req.headers["x-partner-subdomain"] || req.query.subdomain || "footypool";
+  if (subdomain === "copa-media" || subdomain === "copa") {
+    subdomain = "footypool";
+  }
 
   try {
     // 1. Fetch partner to ensure they exist, are Active, and to get their ID as the JWT secret

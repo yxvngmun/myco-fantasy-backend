@@ -2,12 +2,14 @@ import { Router } from "express";
 import { pool } from "../db.js";
 import { sendEmail } from "../lib/email.js";
 import { toCsv } from "../lib/csv.js";
+import { signJwt, verifyJwt } from "../lib/jwt.js";
 import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
 import { syncTournamentData } from "../lib/sync.js";
 
 const router = Router();
+const JWT_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
 
 // Helper to generate secure random token
 function generateToken() {
@@ -283,7 +285,7 @@ router.post("/:id/approve-kyc", async (req, res) => {
       text: `Your Partner Portal is approved! Access at: ${portalUrl}. Username: ${partner.email}, Temp Password: ${tempPassword}`,
     });
 
-    res.json({ message: "Partner KYC approved and activation email dispatched.", partner });
+    res.json({ message: "Partner KYC approved and activation email dispatched.", partner, tempPassword });
   } catch (err) {
     console.error("Approve KYC error:", err);
     res.status(500).json({ error: "Failed to approve KYC." });
@@ -779,7 +781,10 @@ router.post("/:subdomain/auth/login", async (req, res) => {
     req.session.partnerId = partner.id;
     req.session.partnerSubdomain = subdomain;
 
-    res.json({ success: true, partner: { id: partner.id, name: partner.name, email: partner.email, subdomain } });
+    // Issue JWT token for cross-origin support
+    const token = signJwt({ partnerId: partner.id, partnerSubdomain: subdomain }, JWT_SECRET, 60 * 60 * 24 * 7);
+
+    res.json({ success: true, partner: { id: partner.id, name: partner.name, email: partner.email, subdomain }, token });
   } catch (err) {
     console.error("Partner login error:", err);
     res.status(500).json({ error: "Failed to log in." });
@@ -801,6 +806,30 @@ router.post("/:subdomain/auth/logout", async (req, res) => {
 router.get("/:subdomain/auth/session", async (req, res) => {
   const { subdomain } = req.params;
 
+  // 1. Check JWT token from Authorization header
+  const authHeader = req.headers["authorization"];
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    const payload = verifyJwt(token, JWT_SECRET);
+    if (payload && payload.partnerId && payload.partnerSubdomain === subdomain) {
+      try {
+        const { rows } = await pool.query(
+          "SELECT id, name, email, subdomain, status FROM partners WHERE id = $1",
+          [payload.partnerId]
+        );
+        if (rows.length > 0 && rows[0].status === "Active") {
+          // Also restore session for downstream routes
+          req.session.partnerId = payload.partnerId;
+          req.session.partnerSubdomain = subdomain;
+          return res.json({ loggedIn: true, partner: rows[0] });
+        }
+      } catch (err) {
+        console.error("JWT session check error:", err);
+      }
+    }
+  }
+
+  // 2. Fall back to session cookie
   if (req.session.partnerId && req.session.partnerSubdomain === subdomain) {
     try {
       const { rows } = await pool.query(

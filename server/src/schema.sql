@@ -280,7 +280,7 @@ CREATE TABLE IF NOT EXISTS partner_sports_sdk (
   tournament_id UUID REFERENCES tournaments(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT unique_partner_sport UNIQUE (partner_id, sport_key)
+  CONSTRAINT unique_partner_tournament UNIQUE (partner_id, tournament_id)
 );
 
 

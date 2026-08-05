@@ -11,6 +11,28 @@ import { syncTournamentData } from "../lib/sync.js";
 const router = Router();
 const JWT_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
 
+// Auto-migration & Schema constraint fix
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE partner_sports_sdk DROP CONSTRAINT IF EXISTS unique_partner_sport;
+      ALTER TABLE partner_sports_sdk ADD CONSTRAINT unique_partner_tournament UNIQUE (partner_id, tournament_id);
+    `).catch(() => {});
+
+    await pool.query(`
+      UPDATE tournaments 
+      SET sport_key = 'cricket' 
+      WHERE api_league_id IN (50, 51) OR name ILIKE '%PCB%' OR name ILIKE '%IPL%' OR name ILIKE '%Cricket%';
+
+      UPDATE partner_sports_sdk 
+      SET sport_key = 'cricket' 
+      WHERE tournament_id IN (SELECT id FROM tournaments WHERE sport_key = 'cricket');
+    `).catch((e) => console.warn("Cricket migration warning:", e.message));
+  } catch (e) {
+    // Ignore migration warning
+  }
+})();
+
 // Helper to generate secure random token
 function generateToken() {
   return (
@@ -1012,8 +1034,8 @@ router.post("/:subdomain/tournaments", async (req, res) => {
       await pool.query(
         `INSERT INTO partner_sports_sdk (partner_id, sport_key, sdk_token, status, configuration, tournament_id)
          VALUES ($1, $2, $3, 'PUBLISHED', $4, $5)
-         ON CONFLICT (partner_id, sport_key)
-         DO UPDATE SET status = 'PUBLISHED', configuration = EXCLUDED.configuration, tournament_id = EXCLUDED.tournament_id, updated_at = now()`,
+         ON CONFLICT (partner_id, tournament_id)
+         DO UPDATE SET status = 'PUBLISHED', configuration = EXCLUDED.configuration, updated_at = now()`,
         [partner.id, sportKey, sdkToken, JSON.stringify(configData), tournament.id]
       );
     }
@@ -1120,8 +1142,8 @@ router.patch("/:subdomain/tournaments/:id", async (req, res) => {
       await pool.query(
         `INSERT INTO partner_sports_sdk (partner_id, sport_key, sdk_token, status, configuration, tournament_id)
          VALUES ($1, $2, $3, 'PUBLISHED', $4, $5)
-         ON CONFLICT (partner_id, sport_key)
-         DO UPDATE SET status = 'PUBLISHED', configuration = EXCLUDED.configuration, tournament_id = EXCLUDED.tournament_id, updated_at = now()`,
+         ON CONFLICT (partner_id, tournament_id)
+         DO UPDATE SET status = 'PUBLISHED', configuration = EXCLUDED.configuration, updated_at = now()`,
         [partner.id, tournament.sport_key, sdkToken, JSON.stringify(configData), tournament.id]
       );
     } else {

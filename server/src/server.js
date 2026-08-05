@@ -17,3 +17,5 @@ app.listen(port, () => {
 // Restart again
 
 // Restart again after fixing SQL placeholders
+
+// Trigger restart for requirePartnerAuth update

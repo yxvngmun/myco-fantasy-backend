@@ -537,7 +537,14 @@ async function runLiveSync(tournamentId, leagueId, season) {
 
 async function runCricketLiveSync(tournamentId, leagueId, season) {
   console.log('[Sync] Fetching cricket series for tournament ' + tournamentId);
-  const sourceMap = { ipl: '87c62aac-bc3c-4738-ab93-19da0690488f', t20_wc: '5021ebc1-c2a3-419d-9883-cb641c05fe72' };
+  const sourceMap = { 
+    ipl: '87c62aac-bc3c-4738-ab93-19da0690488f', 
+    t20_wc: '5021ebc1-c2a3-419d-9883-cb641c05fe72',
+    50: '87c62aac-bc3c-4738-ab93-19da0690488f',
+    '50': '87c62aac-bc3c-4738-ab93-19da0690488f',
+    51: '5021ebc1-c2a3-419d-9883-cb641c05fe72',
+    '51': '5021ebc1-c2a3-419d-9883-cb641c05fe72'
+  };
   const seriesId = sourceMap[leagueId] || '87c62aac-bc3c-4738-ab93-19da0690488f';
 
   const infoData = await fetchFromCricketApi('/series_info?id=' + seriesId);

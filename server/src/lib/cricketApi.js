@@ -1,19 +1,17 @@
 import "dotenv/config";
 
-const KEY = process.env.CRICAPI_KEY;
+const KEY = process.env.CRICAPI_KEY || "564a9dca-7072-4673-9688-f26188641d66";
 const BASE = "https://api.cricapi.com/v1";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const hasErr = (d) => d.status !== "success" || d.data === undefined;
 
 export async function fetchFromCricketApi(path, tries = 4) {
-  if (!KEY) {
-    throw new Error("CRICAPI_KEY is not defined in backend .env");
-  }
+  const apiKey = KEY || "564a9dca-7072-4673-9688-f26188641d66";
 
   for (let i = 0; i < tries; i++) {
     try {
       const sep = path.includes("?") ? "&" : "?";
-      const url = `${BASE}${path}${sep}apikey=${KEY}`;
+      const url = `${BASE}${path}${sep}apikey=${apiKey}`;
       const response = await fetch(url);
       
       if (!response.ok) {

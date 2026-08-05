@@ -1,0 +1,17 @@
+﻿{
+    "apikey":  "564a9dca-7072-4673-9688-f26188641d66",
+    "data":  [
+
+             ],
+    "status":  "success",
+    "info":  {
+                 "hitsToday":  5,
+                 "hitsUsed":  1,
+                 "hitsLimit":  100,
+                 "credits":  0,
+                 "server":  9,
+                 "queryTime":  18.1904,
+                 "s":  0,
+                 "cache":  0
+             }
+}

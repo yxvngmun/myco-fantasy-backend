@@ -1,0 +1,30 @@
+﻿{
+    "apikey":  "564a9dca-7072-4673-9688-f26188641d66",
+    "data":  {
+                 "info":  {
+                              "id":  "5021ebc1-c2a3-419d-9883-cb641c05fe72",
+                              "name":  "ICC Men\u0027s T20 World Cup Sub Regional Europe Qualifier C 2026",
+                              "startdate":  "Aug 14",
+                              "enddate":  "Aug 21",
+                              "odi":  0,
+                              "t20":  24,
+                              "test":  0,
+                              "squads":  0,
+                              "matches":  0
+                          },
+                 "matchList":  [
+
+                               ]
+             },
+    "status":  "success",
+    "info":  {
+                 "hitsToday":  4,
+                 "hitsUsed":  1,
+                 "hitsLimit":  100,
+                 "credits":  0,
+                 "server":  5,
+                 "queryTime":  44.3853,
+                 "s":  0,
+                 "cache":  0
+             }
+}

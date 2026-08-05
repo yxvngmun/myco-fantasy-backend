@@ -1107,7 +1107,7 @@ router.patch("/:subdomain/tournaments/:id", async (req, res) => {
     if (tournament.status === "Active") {
       const configData = {
         tournamentName: tournament.name,
-        source: tournament.api_league_id ? (tournament.api_league_id === 39 ? "epl" : tournament.api_league_id === 2 ? "ucl" : tournament.api_league_id === 1 ? "wc" : "static") : "static",
+        source: tournament.api_league_id ? (tournament.api_league_id === 39 ? "epl" : tournament.api_league_id === 2 ? "ucl" : tournament.api_league_id === 1 ? "wc" : tournament.api_league_id === 50 ? "ipl" : tournament.api_league_id === 51 ? "t20_wc" : "static") : "static",
         budgetCap: tournament.team_budget !== undefined ? Number(tournament.team_budget) : 100,
         squadSize: 11 + (tournament.substitutes_allowed !== undefined ? Number(tournament.substitutes_allowed) : 4),
         transfersPerMatch: tournament.transfers_per_match !== undefined ? Number(tournament.transfers_per_match) : 2,
@@ -1124,6 +1124,11 @@ router.patch("/:subdomain/tournaments/:id", async (req, res) => {
          DO UPDATE SET status = 'PUBLISHED', configuration = EXCLUDED.configuration, tournament_id = EXCLUDED.tournament_id, updated_at = now()`,
         [partner.id, tournament.sport_key, sdkToken, JSON.stringify(configData), tournament.id]
       );
+    } else {
+      await pool.query(
+        "UPDATE partner_sports_sdk SET status = 'INACTIVE', updated_at = now() WHERE partner_id = $1 AND tournament_id = $2",
+        [partner.id, tournament.id]
+      );
     }
 
     // Trigger sync if league or season changed
@@ -1137,6 +1142,37 @@ router.patch("/:subdomain/tournaments/:id", async (req, res) => {
   } catch (err) {
     console.error("Update tournament error:", err);
     res.status(500).json({ error: "Failed to update tournament." });
+  }
+});
+
+router.delete("/:subdomain/tournaments/:id", async (req, res) => {
+  const { subdomain, id } = req.params;
+  try {
+    const partnerRes = await pool.query("SELECT id FROM partners WHERE subdomain = $1", [subdomain]);
+    if (partnerRes.rows.length === 0) return res.status(404).json({ error: "Partner not found" });
+    const partnerId = partnerRes.rows[0].id;
+
+    const tournRes = await pool.query("SELECT * FROM tournaments WHERE id = $1 AND partner_id = $2", [id, partnerId]);
+    if (tournRes.rows.length === 0) return res.status(404).json({ error: "Tournament not found" });
+
+    // Permanent cascading deletion from everywhere
+    await pool.query("DELETE FROM user_squads WHERE tournament_id = $1", [id]);
+    await pool.query("DELETE FROM contests WHERE tournament_id = $1", [id]);
+    await pool.query("DELETE FROM fixtures WHERE tournament_id = $1", [id]);
+    await pool.query("DELETE FROM players WHERE tournament_id = $1", [id]);
+    await pool.query("DELETE FROM partner_sports_sdk WHERE tournament_id = $1", [id]);
+    await pool.query("DELETE FROM tournaments WHERE id = $1 AND partner_id = $2", [id, partnerId]);
+
+    // Recalculate live_tournaments count
+    await pool.query(
+      "UPDATE partners SET live_tournaments = (SELECT COUNT(*) FROM tournaments WHERE partner_id = $1 AND status = 'Active') WHERE id = $1",
+      [partnerId]
+    );
+
+    res.json({ success: true, message: "Tournament permanently deleted." });
+  } catch (err) {
+    console.error("Delete tournament error:", err);
+    res.status(500).json({ error: "Failed to delete tournament." });
   }
 });
 

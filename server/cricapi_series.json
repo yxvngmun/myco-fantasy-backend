@@ -1,0 +1,292 @@
+﻿{
+    "apikey":  "564a9dca-7072-4673-9688-f26188641d66",
+    "data":  [
+                 {
+                     "id":  "5021ebc1-c2a3-419d-9883-cb641c05fe72",
+                     "name":  "ICC Men\u0027s T20 World Cup Sub Regional Europe Qualifier C 2026",
+                     "startDate":  "Aug 14",
+                     "endDate":  "Aug 21",
+                     "odi":  0,
+                     "t20":  24,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  0
+                 },
+                 {
+                     "id":  "6bd1930d-339b-4d2f-8cea-d5bb32a2dba5",
+                     "name":  "ICC Men\u0027s T20 World Cup Europe Sub Regional Qualifier B, 2026",
+                     "startDate":  "2026-07-08",
+                     "endDate":  "Jul 14",
+                     "odi":  0,
+                     "t20":  20,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  20
+                 },
+                 {
+                     "id":  "5f08e3c0-5016-482b-9a5f-7f6adf7ee59d",
+                     "name":  "ICC Mens T20 World Cup Americas Sub Regional Qualifier 2026",
+                     "startDate":  "2026-06-21",
+                     "endDate":  "Jun 27",
+                     "odi":  0,
+                     "t20":  10,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  10
+                 },
+                 {
+                     "id":  "ba064151-7e74-4882-ac4e-9f47d08211c8",
+                     "name":  "ICC Men\u0027s T20 World Cup Sub Regional Africa Qualifier Group A 2026",
+                     "startDate":  "2026-05-23",
+                     "endDate":  "May 30",
+                     "odi":  0,
+                     "t20":  17,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  21
+                 },
+                 {
+                     "id":  "0c6e47d9-cf86-4733-aa0b-0db09c3b222a",
+                     "name":  "ICC Womens T20 World Cup Warm-up Matches 2026",
+                     "startDate":  "2026-06-06",
+                     "endDate":  "Jun 10",
+                     "odi":  0,
+                     "t20":  12,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  12
+                 },
+                 {
+                     "id":  "bb833bc4-4fc4-4c08-9821-7a697446ac07",
+                     "name":  "ICC Men\u0027s T20 World Cup Europe Sub Regional Qualifier A 2026",
+                     "startDate":  "2026-05-16",
+                     "endDate":  "May 23",
+                     "odi":  0,
+                     "t20":  24,
+                     "test":  0,
+                     "squads":  8,
+                     "matches":  24
+                 },
+                 {
+                     "id":  "7ac098a3-5d70-4c81-8e81-199edbeffc29",
+                     "name":  "ICC Cricket World Cup League Two 2023-27",
+                     "startDate":  "2024-02-15",
+                     "endDate":  "Mar 30",
+                     "odi":  97,
+                     "t20":  0,
+                     "test":  0,
+                     "squads":  8,
+                     "matches":  121
+                 },
+                 {
+                     "id":  "37e7f091-fd4b-4b15-9a4d-8e8df4c46340",
+                     "name":  "ICC Men\u0027s T20 World Cup East Asia Pacific Qualifier 2026",
+                     "startDate":  "2026-05-08",
+                     "endDate":  "May 18",
+                     "odi":  0,
+                     "t20":  21,
+                     "test":  0,
+                     "squads":  9,
+                     "matches":  21
+                 },
+                 {
+                     "id":  "259cb926-fb6d-4b01-826a-10d557d79f3b",
+                     "name":  "ICC Men\u0027s T20 World Cup Africa Sub Regional Qualifier B, 2026",
+                     "startDate":  "2026-03-24",
+                     "endDate":  "Mar 29",
+                     "odi":  0,
+                     "t20":  15,
+                     "test":  0,
+                     "squads":  6,
+                     "matches":  15
+                 },
+                 {
+                     "id":  "b5b6a501-3fd7-4fd8-ac57-11a10f6fca93",
+                     "name":  "ICC Men\u0027s T20 2028 World Cup Americas Sub Regional Qualifier B, 2026",
+                     "startDate":  "2026-03-08",
+                     "endDate":  "Mar 16",
+                     "odi":  0,
+                     "t20":  12,
+                     "test":  0,
+                     "squads":  4,
+                     "matches":  12
+                 },
+                 {
+                     "id":  "5978f057-af70-4dcf-b9ee-04831b8df947",
+                     "name":  "ICC Men\u0027s T20 World Cup 2026",
+                     "startDate":  "2026-02-07",
+                     "endDate":  "Mar 08",
+                     "odi":  0,
+                     "t20":  55,
+                     "test":  0,
+                     "squads":  20,
+                     "matches":  55
+                 },
+                 {
+                     "id":  "0bf33a70-70e5-47eb-8161-180c05da8726",
+                     "name":  "ICC Under 19 World Cup 2026",
+                     "startDate":  "2026-01-17",
+                     "endDate":  "Feb 06",
+                     "odi":  41,
+                     "t20":  0,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  41
+                 },
+                 {
+                     "id":  "c4ca5cd5-e25c-4d83-bb77-2d193d93475a",
+                     "name":  "ICC Men\u0027s T20 World Cup Warm up Matches 2026",
+                     "startDate":  "2026-02-02",
+                     "endDate":  "Feb 06",
+                     "odi":  0,
+                     "t20":  16,
+                     "test":  0,
+                     "squads":  20,
+                     "matches":  16
+                 },
+                 {
+                     "id":  "8ed81407-ba10-4d5b-9ca5-29c1d511de90",
+                     "name":  "ICC Women\u0027s T20 World Cup Global Qualifier 2026",
+                     "startDate":  "2026-01-18",
+                     "endDate":  "Feb 01",
+                     "odi":  0,
+                     "t20":  29,
+                     "test":  0,
+                     "squads":  10,
+                     "matches":  29
+                 },
+                 {
+                     "id":  "7191ede3-573f-4a59-85a7-3b0b33dfaf90",
+                     "name":  "ICC U19 World Cup Warm up Matches 2026",
+                     "endDate":  "Jan 14",
+                     "odi":  16,
+                     "t20":  0,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  16
+                 },
+                 {
+                     "id":  "63354b30-db9a-4ddd-8760-8cc110960de4",
+                     "name":  "ICC Mens T20 World Cup Africa Regional Final 2025",
+                     "startDate":  "2025-09-26",
+                     "endDate":  "Oct 04",
+                     "odi":  0,
+                     "t20":  20,
+                     "test":  0,
+                     "squads":  8,
+                     "matches":  20
+                 },
+                 {
+                     "id":  "f3e5c7dd-332c-4893-9067-aa2bfe6d2b85",
+                     "name":  "ICC Women\u0027s T20 World Cup 2026",
+                     "startDate":  "2026-06-12",
+                     "endDate":  "Jul 05",
+                     "odi":  0,
+                     "t20":  33,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  33
+                 },
+                 {
+                     "id":  "5384720c-b4d9-4524-b6cf-ed15470bbaaf",
+                     "name":  "ICC Mens T20 World Cup East Asia Pacific Qualifier 2025",
+                     "startDate":  "2025-10-08",
+                     "endDate":  "Oct 17",
+                     "odi":  0,
+                     "t20":  21,
+                     "test":  0,
+                     "squads":  9,
+                     "matches":  21
+                 },
+                 {
+                     "id":  "717b1480-4806-4423-805d-a6b0c379d788",
+                     "name":  "ICC Womens World Cup 2025",
+                     "startDate":  "2025-09-30",
+                     "endDate":  "Nov 02",
+                     "odi":  31,
+                     "t20":  0,
+                     "test":  0,
+                     "squads":  8,
+                     "matches":  31
+                 },
+                 {
+                     "id":  "189f65fa-dbc0-4901-9172-318694166873",
+                     "name":  "ICC Womens World Cup Warm-up Matches 2025",
+                     "startDate":  "2025-09-25",
+                     "endDate":  "Sep 28",
+                     "odi":  8,
+                     "t20":  0,
+                     "test":  0,
+                     "squads":  9,
+                     "matches":  17
+                 },
+                 {
+                     "id":  "15cbe3a0-12cc-42f4-8120-c6e7fbe75acd",
+                     "name":  "ICC Womens T20 World Cup Africa Region Division One Qualifier 2025",
+                     "startDate":  "2025-08-31",
+                     "endDate":  "Sep 06",
+                     "odi":  0,
+                     "t20":  20,
+                     "test":  0,
+                     "squads":  8,
+                     "matches":  20
+                 },
+                 {
+                     "id":  "9d78d385-0df3-4461-b86c-16721cfd9b1d",
+                     "name":  "ICC Womens T20 World Cup Europe Qualifier Division 1, 2025",
+                     "startDate":  "2025-08-20",
+                     "endDate":  "Aug 27",
+                     "odi":  0,
+                     "t20":  12,
+                     "test":  0,
+                     "squads":  4,
+                     "matches":  12
+                 },
+                 {
+                     "id":  "364ba7a9-886c-4ed4-bc93-98769a9827d7",
+                     "name":  "ICC Womens T20 World Cup East Asia Pacific Qualifier 2025",
+                     "startDate":  "2025-09-08",
+                     "endDate":  "Sep 15",
+                     "odi":  0,
+                     "t20":  20,
+                     "test":  0,
+                     "squads":  8,
+                     "matches":  20
+                 },
+                 {
+                     "id":  "a5bc992f-36c6-4698-8c68-83653f9a1d7d",
+                     "name":  "ICC Womens T20 World Cup Africa Division 2 Qualifier, 2025",
+                     "startDate":  "2025-07-20",
+                     "endDate":  "Jul 26",
+                     "odi":  0,
+                     "t20":  20,
+                     "test":  0,
+                     "squads":  8,
+                     "matches":  20
+                 },
+                 {
+                     "id":  "50bc06a5-2859-4ceb-90f5-7e5bd1108f6b",
+                     "name":  "ICC Mens T20 World Cup Europe Qualifier 2025",
+                     "startDate":  "2025-07-05",
+                     "endDate":  "Jul 11",
+                     "odi":  0,
+                     "t20":  10,
+                     "test":  0,
+                     "squads":  5,
+                     "matches":  10
+                 }
+             ],
+    "status":  "success",
+    "info":  {
+                 "hitsToday":  3,
+                 "hitsUsed":  1,
+                 "hitsLimit":  100,
+                 "credits":  0,
+                 "server":  8,
+                 "offsetRows":  0,
+                 "totalRows":  92,
+                 "queryTime":  48.8408,
+                 "s":  0,
+                 "cache":  0
+             }
+}

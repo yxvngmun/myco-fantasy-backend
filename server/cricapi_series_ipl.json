@@ -1,0 +1,291 @@
+﻿{
+    "apikey":  "564a9dca-7072-4673-9688-f26188641d66",
+    "data":  [
+                 {
+                     "id":  "2d42b70d-c4d3-4f90-9ae2-00de7244bd0a",
+                     "name":  "Delhi Premier League 2026",
+                     "endDate":  "Aug 30",
+                     "odi":  0,
+                     "t20":  44,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  3
+                 },
+                 {
+                     "id":  "6c3c5876-5cfc-4490-9c8e-8ba90aec4323",
+                     "name":  "Tamil Nadu Premier League 2026",
+                     "startDate":  "2026-08-04",
+                     "endDate":  "Aug 28",
+                     "odi":  0,
+                     "t20":  32,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  32
+                 },
+                 {
+                     "id":  "415eb1aa-b596-49d3-a17e-be8624e9801f",
+                     "name":  "Womens Caribbean Premier League 2026",
+                     "startDate":  "2026-09-05",
+                     "endDate":  "Sep 17",
+                     "odi":  0,
+                     "t20":  8,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  8
+                 },
+                 {
+                     "id":  "f1d8ccd7-42e2-43f0-a2b8-b1e334fba351",
+                     "name":  "Madhya Pradesh Premier League 2026",
+                     "startDate":  "2026-06-03",
+                     "endDate":  "Jun 26",
+                     "odi":  0,
+                     "t20":  48,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  48
+                 },
+                 {
+                     "id":  "6453f3f2-0f39-45a2-ab88-7ea525a2fbc2",
+                     "name":  "Andhra Premier League 2026",
+                     "startDate":  "2026-06-09",
+                     "endDate":  "Jun 30",
+                     "odi":  0,
+                     "t20":  32,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  32
+                 },
+                 {
+                     "id":  "7cce2c26-63d3-4e9a-9728-33546cf732cd",
+                     "name":  "Lanka Premier League 2026",
+                     "startDate":  "2026-07-17",
+                     "endDate":  "Aug 08",
+                     "odi":  0,
+                     "t20":  24,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  24
+                 },
+                 {
+                     "id":  "929c36f6-9ed6-4cec-a2ad-910a2ee4f701",
+                     "name":  "Caribbean Premier League 2026",
+                     "startDate":  "2026-08-07",
+                     "endDate":  "Sep 20",
+                     "odi":  0,
+                     "t20":  39,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  39
+                 },
+                 {
+                     "id":  "87c62aac-bc3c-4738-ab93-19da0690488f",
+                     "name":  "Indian Premier League 2026",
+                     "startDate":  "2026-03-28",
+                     "endDate":  "May 31",
+                     "odi":  0,
+                     "t20":  70,
+                     "test":  0,
+                     "squads":  10,
+                     "matches":  74
+                 },
+                 {
+                     "id":  "f9031715-4a85-4fa4-8ac1-81963c75dab9",
+                     "name":  "Women\u0027s Premier League 2026",
+                     "startDate":  "2026-01-09",
+                     "endDate":  "Feb 05",
+                     "odi":  0,
+                     "t20":  22,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  22
+                 },
+                 {
+                     "id":  "df59249a-2576-4995-8d14-44be98052067",
+                     "name":  "Indian Premier League 2027",
+                     "startDate":  "Mar 14",
+                     "endDate":  "May 30",
+                     "odi":  0,
+                     "t20":  0,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  0
+                 },
+                 {
+                     "id":  "e2599e4b-de2f-453b-a3fb-3ffed047e30c",
+                     "name":  "Bangladesh Premier League 2025-26",
+                     "endDate":  "Jan 23",
+                     "odi":  0,
+                     "t20":  36,
+                     "test":  0,
+                     "squads":  0,
+                     "matches":  38
+                 },
+                 {
+                     "id":  "b7853eca-d281-4429-838a-9cbf17bab47e",
+                     "name":  "Womens Caribbean Premier League 2025",
+                     "startDate":  "2025-09-06",
+                     "endDate":  "Sep 17",
+                     "odi":  0,
+                     "t20":  7,
+                     "test":  0,
+                     "squads":  3,
+                     "matches":  7
+                 },
+                 {
+                     "id":  "8b06b597-dab4-4459-a124-a8a5a4129814",
+                     "name":  "Uttar Pradesh Premier League 2025",
+                     "startDate":  "2025-08-17",
+                     "endDate":  "Sep 06",
+                     "odi":  0,
+                     "t20":  34,
+                     "test":  0,
+                     "squads":  6,
+                     "matches":  34
+                 },
+                 {
+                     "id":  "d83eabfc-d381-4ea2-aa1d-9765506bdd9d",
+                     "name":  "Caribbean Premier League 2025",
+                     "startDate":  "2025-08-14",
+                     "endDate":  "Sep 21",
+                     "odi":  0,
+                     "t20":  34,
+                     "test":  0,
+                     "squads":  6,
+                     "matches":  34
+                 },
+                 {
+                     "id":  "67cfd113-c5e6-4631-9dd5-3c1b0540f674",
+                     "name":  "Andhra Premier League 2025",
+                     "startDate":  "2025-08-08",
+                     "endDate":  "Aug 23",
+                     "odi":  0,
+                     "t20":  25,
+                     "test":  0,
+                     "squads":  7,
+                     "matches":  25
+                 },
+                 {
+                     "id":  "6a8f17a7-ca70-4775-aeb2-05b155b3bd9b",
+                     "name":  "Delhi Premier League 2025",
+                     "startDate":  "2025-08-02",
+                     "endDate":  "Aug 31",
+                     "odi":  0,
+                     "t20":  44,
+                     "test":  0,
+                     "squads":  8,
+                     "matches":  44
+                 },
+                 {
+                     "id":  "12873936-aad4-4ca6-bed0-e57b13449445",
+                     "name":  "Pondicherry Premier League 2025",
+                     "startDate":  "2025-07-06",
+                     "endDate":  "Jul 27",
+                     "odi":  0,
+                     "t20":  7,
+                     "test":  0,
+                     "squads":  6,
+                     "matches":  34
+                 },
+                 {
+                     "id":  "93aad088-c902-41e1-9fa7-8e95d62c81c1",
+                     "name":  "Chhattisgarh Cricket Premier League 2025",
+                     "startDate":  "2025-06-06",
+                     "endDate":  "Jun 15",
+                     "odi":  0,
+                     "t20":  1,
+                     "test":  0,
+                     "squads":  6,
+                     "matches":  18
+                 },
+                 {
+                     "id":  "dcc2c889-6c5b-43b8-919c-8f101ccb6edd",
+                     "name":  "Tamil Nadu Premier League 2025",
+                     "startDate":  "2025-06-05",
+                     "endDate":  "Jul 06",
+                     "odi":  0,
+                     "t20":  32,
+                     "test":  0,
+                     "squads":  10,
+                     "matches":  32
+                 },
+                 {
+                     "id":  "7851cc98-9abc-4fd5-aa37-a38b5b67d5ca",
+                     "name":  "Maharashtra Premier League, 2025",
+                     "startDate":  "2025-06-04",
+                     "endDate":  "Jun 22",
+                     "odi":  0,
+                     "t20":  34,
+                     "test":  0,
+                     "squads":  6,
+                     "matches":  35
+                 },
+                 {
+                     "id":  "d5a498c8-7596-4b93-8ab0-e0efc3345312",
+                     "name":  "Indian Premier League 2025 (IPL)",
+                     "startDate":  "2025-03-22",
+                     "endDate":  "Jun 03",
+                     "odi":  0,
+                     "t20":  75,
+                     "test":  0,
+                     "squads":  10,
+                     "matches":  75
+                 },
+                 {
+                     "id":  "bedf8bb2-7a5b-4812-bd50-2ce0a468ffb9",
+                     "name":  "Womens Premier League 2025",
+                     "startDate":  "2025-02-14",
+                     "endDate":  "Mar 15",
+                     "odi":  0,
+                     "t20":  22,
+                     "test":  0,
+                     "squads":  5,
+                     "matches":  22
+                 },
+                 {
+                     "id":  "605d168a-3b7c-4303-b98f-182b0a4c84e4",
+                     "name":  "Bangladesh Premier League, 2024-25",
+                     "startDate":  "2024-12-30",
+                     "endDate":  "Feb 07",
+                     "odi":  0,
+                     "t20":  46,
+                     "test":  0,
+                     "squads":  8,
+                     "matches":  46
+                 },
+                 {
+                     "id":  "39bb260e-684d-46c5-9501-73cc6ee0fe31",
+                     "name":  "Womens Caribbean Premier League 2024",
+                     "startDate":  "2024-08-21",
+                     "endDate":  "Aug 29",
+                     "odi":  0,
+                     "t20":  7,
+                     "test":  0,
+                     "squads":  3,
+                     "matches":  7
+                 },
+                 {
+                     "id":  "1b5d955a-4e36-4280-9c9d-2746432f6bba",
+                     "name":  "Lanka Premier League, 2024",
+                     "startDate":  "2024-07-01",
+                     "endDate":  "Jul 21",
+                     "odi":  0,
+                     "t20":  24,
+                     "test":  0,
+                     "squads":  6,
+                     "matches":  24
+                 }
+             ],
+    "status":  "success",
+    "info":  {
+                 "hitsToday":  6,
+                 "hitsUsed":  1,
+                 "hitsLimit":  100,
+                 "credits":  0,
+                 "server":  18,
+                 "offsetRows":  0,
+                 "totalRows":  45,
+                 "queryTime":  49.1011,
+                 "s":  0,
+                 "cache":  0
+             }
+}

@@ -19,3 +19,5 @@ app.listen(port, () => {
 // Restart again after fixing SQL placeholders
 
 // Trigger restart for requirePartnerAuth update
+
+// Trigger restart for tournament delete & status routes

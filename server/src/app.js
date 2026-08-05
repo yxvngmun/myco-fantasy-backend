@@ -23,9 +23,7 @@ function getAllowedOrigins() {
 export function createApp() {
   const app = express();
 
-  if (process.env.NODE_ENV === "production") {
-    app.set("trust proxy", 1);
-  }
+  app.set("trust proxy", 1);
 
   // 1. Helmet Security Headers with Frame Ancestors CSP for OTT Embedding (myco.io)
   app.use(
@@ -115,12 +113,25 @@ export function createApp() {
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        secure: false, // dynamically overridden
+        sameSite: "lax", // dynamically overridden
         maxAge: 1000 * 60 * 60 * 24 * 7,
       },
     })
   );
+
+  // Dynamic session cookie configuration for local vs tunnel/production HTTPS
+  app.use((req, res, next) => {
+    const isSecure = req.secure || req.headers["x-forwarded-proto"] === "https";
+    if (isSecure) {
+      req.session.cookie.secure = true;
+      req.session.cookie.sameSite = "none";
+    } else {
+      req.session.cookie.secure = false;
+      req.session.cookie.sameSite = "lax";
+    }
+    next();
+  });
 
   app.use("/api/auth", authRoutes);
   app.use("/api/partners", partnersRoutes);

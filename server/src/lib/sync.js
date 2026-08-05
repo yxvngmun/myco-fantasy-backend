@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { pool } from "../db.js";
 import { fetchFromFootballApi } from "./footballApi.js";
+import { fetchFromCricketApi } from "./cricketApi.js";
 import { recognizableName } from "./naming.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -278,12 +279,31 @@ function getStatsBreakdown(sportKey, playerId, pos, rules) {
 export async function syncTournamentData(tournamentId, leagueId, season) {
   console.log(`[Sync] Starting sync for Tournament ${tournamentId} (League: ${leagueId}, Season: ${season})`);
 
-  if (!process.env.API_FOOTBALL_KEY) {
-    console.log("[Sync] No API_FOOTBALL_KEY found. Running fallback static seeding...");
-    await runFallbackSeeding(tournamentId);
+  const client = await pool.connect();
+  let sportKey = "football";
+  try {
+    const { sportKey: dbSportKey } = await getRulesForTournament(client, tournamentId);
+    sportKey = dbSportKey;
+  } finally {
+    client.release();
+  }
+
+  if (sportKey === "cricket") {
+    if (!process.env.CRICAPI_KEY) {
+      console.log("[Sync] No CRICAPI_KEY found. Running fallback static seeding...");
+      await runFallbackSeeding(tournamentId);
+    } else {
+      console.log("[Sync] CRICAPI_KEY detected. Running live cricket sync...");
+      await runCricketLiveSync(tournamentId, leagueId, season);
+    }
   } else {
-    console.log("[Sync] API_FOOTBALL_KEY detected. Running live sync...");
-    await runLiveSync(tournamentId, leagueId, season);
+    if (!process.env.API_FOOTBALL_KEY) {
+      console.log("[Sync] No API_FOOTBALL_KEY found. Running fallback static seeding...");
+      await runFallbackSeeding(tournamentId);
+    } else {
+      console.log("[Sync] API_FOOTBALL_KEY detected. Running live football sync...");
+      await runLiveSync(tournamentId, leagueId, season);
+    }
   }
 }
 
@@ -508,6 +528,97 @@ async function runLiveSync(tournamentId, leagueId, season) {
     console.log(`[Sync] Live sync for tournament ${tournamentId} completed successfully!`);
   } catch (err) {
     await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+
+async function runCricketLiveSync(tournamentId, leagueId, season) {
+  console.log('[Sync] Fetching cricket series for tournament ' + tournamentId);
+  const sourceMap = { ipl: '87c62aac-bc3c-4738-ab93-19da0690488f', t20_wc: '5021ebc1-c2a3-419d-9883-cb641c05fe72' };
+  const seriesId = sourceMap[leagueId] || '87c62aac-bc3c-4738-ab93-19da0690488f';
+
+  const infoData = await fetchFromCricketApi('/series_info?id=' + seriesId);
+  const squadData = await fetchFromCricketApi('/series_squad?id=' + seriesId);
+
+  const matchList = infoData.data?.matchList || [];
+  const squads = squadData.data || [];
+
+  console.log('[Sync] Found ' + matchList.length + ' matches and ' + squads.length + ' teams in squad data.');
+
+  const fixturesToInsert = [];
+  const playersToInsert = [];
+  const teamById = {};
+
+  for (const s of squads) {
+    const tName = s.teamName;
+    const tCode = tName.slice(0, 3).toUpperCase();
+    teamById[tName] = tCode;
+    if (s.players) {
+      for (const p of s.players) {
+        const pos = p.role ? p.role : 'Batsman';
+        playersToInsert.push({
+          id: p.id,
+          name: p.name,
+          club: tName,
+          short: p.name.split(' ').slice(-1)[0],
+          pos: pos === 'Wicketkeeper' ? 'Wicket-Keeper' : pos,
+          val: 5.0 + (p.id.length % 5),
+        });
+      }
+    }
+  }
+
+  for (const f of matchList) {
+    const t1 = f.teams[0];
+    const t2 = f.teams[1];
+    fixturesToInsert.push({
+      round: f.name.split(',')[1]?.trim() || f.name,
+      date: f.date,
+      dateLabel: fmtDate(f.dateTimeGMT),
+      homeName: t1,
+      homeCode: teamById[t1] || t1.slice(0, 3).toUpperCase(),
+      homeColor: '#00E676',
+      awayName: t2,
+      awayCode: teamById[t2] || t2.slice(0, 3).toUpperCase(),
+      awayColor: '#FF5252',
+      status: f.status,
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { sportKey, rules } = await getRulesForTournament(client, tournamentId);
+
+    for (const f of fixturesToInsert) {
+      await client.query(
+        'INSERT INTO fixtures (tournament_id, round, event_date, date_label, home_name, home_code, home_color, away_name, away_code, away_color, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+        [tournamentId, f.round, f.date, f.dateLabel, f.homeName, f.homeCode, f.homeColor, f.awayName, f.awayCode, f.awayColor, f.status]
+      );
+    }
+
+    for (const p of playersToInsert) {
+      const val = Number(p.val || 5.0);
+      const priceHistory = JSON.stringify([Number((val - 0.2).toFixed(1)), Number((val - 0.1).toFixed(1)), Number(val.toFixed(1))]);
+      const statsBreakdown = getStatsBreakdown(sportKey, p.id, p.pos, rules);
+      const parsedBreakdown = JSON.parse(statsBreakdown);
+      const totalPts = parsedBreakdown.reduce((sum, row) => sum + row.pts, 0);
+      const latestPts = parsedBreakdown.filter(row => row.runs > 0 || row.wickets > 0 || (row.gw < 4 && row.pts > 0)).pop()?.pts || 0;
+      const matches = parsedBreakdown.filter(b => b.runs > 0 || b.wickets > 0).length;
+
+      await client.query(
+        'INSERT INTO players (tournament_id, id, name, club, short, color, jersey_number, pos, val, pts, total_pts, matches, status, opp, fixture_date, stats_breakdown, price_history) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) ON CONFLICT (tournament_id, id) DO UPDATE SET name = EXCLUDED.name, club = EXCLUDED.club, short = EXCLUDED.short, pos = EXCLUDED.pos, val = EXCLUDED.val, pts = EXCLUDED.pts, total_pts = EXCLUDED.total_pts, matches = EXCLUDED.matches, stats_breakdown = EXCLUDED.stats_breakdown, price_history = EXCLUDED.price_history, updated_at = now()',
+        [tournamentId, p.id, p.name, p.club, p.short, '#555555', '', p.pos, p.val, latestPts, totalPts, matches, 'available', '', '', statsBreakdown, priceHistory]
+      );
+    }
+
+    await client.query('COMMIT');
+    console.log('[Sync] Cricket live sync completed successfully for Tournament ' + tournamentId);
+  } catch (err) {
+    await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();

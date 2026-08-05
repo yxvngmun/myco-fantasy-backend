@@ -519,43 +519,35 @@ router.get("/:subdomain/contests", async (req, res) => {
 
 router.post("/:subdomain/contests", async (req, res) => {
   const { subdomain } = req.params;
-  const { name, tournamentId, category, entryFee, maxEntries, winnerDistribution } = req.body || {};
-
-  if (!name) return res.status(400).json({ error: "Contest name is required." });
-
   try {
-    const partnerRes = await pool.query("SELECT id, commission FROM partners WHERE subdomain = $1", [subdomain]);
+    const partnerRes = await pool.query("SELECT id FROM partners WHERE subdomain = $1", [subdomain]);
     if (partnerRes.rows.length === 0) return res.status(404).json({ error: "Partner not found" });
     const partner = partnerRes.rows[0];
 
-    const fee = Number(entryFee || 0);
-    const maxE = Number(maxEntries || 100);
-    const platformFeePct = Number(partner.commission || 15);
-    const totalPrizeBeforeFee = fee * maxE;
-    const prizePool = Math.max(0, totalPrizeBeforeFee * (1 - platformFeePct / 100));
+    const { name, tournament_id, category, entryFee, maxEntries, prizePool, customCurve } = req.body;
 
-    const defaultDistribution = winnerDistribution || [
-      { rank: 1, percent: 50 },
-      { rank: 2, percent: 30 },
-      { rank: 3, percent: 20 },
-    ];
+    // Ensure tournament exists and belongs to this partner
+    const tournCheck = await pool.query("SELECT id FROM tournaments WHERE id = $1 AND partner_id = $2", [tournament_id, partner.id]);
+    if (tournCheck.rows.length === 0) {
+      return res.status(400).json({ error: "Invalid tournament_id" });
+    }
 
     const { rows } = await pool.query(
       `INSERT INTO contests (
          partner_id, tournament_id, name, category, entry_fee, max_entries,
-         prize_pool, winner_distribution, status
+         prize_pool, status, prize_curve
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Upcoming')
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Upcoming', $8)
        RETURNING *`,
       [
         partner.id,
-        tournamentId || null,
+        tournament_id,
         name,
         category || "Practice",
-        fee,
-        maxE,
-        prizePool,
-        JSON.stringify(defaultDistribution),
+        Number(entryFee || 0),
+        Number(maxEntries || 100),
+        Number(prizePool || 0),
+        JSON.stringify(customCurve || []),
       ]
     );
 
@@ -795,8 +787,11 @@ router.post("/:subdomain/auth/login", async (req, res) => {
  * Partner Authentication: Logout
  */
 router.post("/:subdomain/auth/logout", async (req, res) => {
-  req.session.partnerId = null;
-  req.session.partnerSubdomain = null;
+  if (req.session) {
+    req.session.partnerId = null;
+    req.session.partnerSubdomain = null;
+  }
+  res.clearCookie("connect.sid");
   res.json({ success: true });
 });
 
@@ -1004,9 +999,9 @@ router.post("/:subdomain/tournaments", async (req, res) => {
     if (status === "Active") {
       const configData = {
         tournamentName: tournament.name,
-        source: tournament.api_league_id ? (tournament.api_league_id === 39 ? "epl" : tournament.api_league_id === 2 ? "ucl" : tournament.api_league_id === 1 ? "wc" : "static") : "static",
+        source: tournament.api_league_id ? (tournament.api_league_id === 39 ? "epl" : tournament.api_league_id === 2 ? "ucl" : tournament.api_league_id === 1 ? "wc" : tournament.api_league_id === 50 ? "ipl" : tournament.api_league_id === 51 ? "t20_wc" : "static") : "static",
         budgetCap: tournament.team_budget !== undefined ? Number(tournament.team_budget) : 100,
-        squadSize: 11,
+        squadSize: 11 + (tournament.substitutes_allowed !== undefined ? Number(tournament.substitutes_allowed) : 4),
         transfersPerMatch: tournament.transfers_per_match !== undefined ? Number(tournament.transfers_per_match) : 2,
         captainMultiplier: tournament.captain_vice_captain ? 2 : 1,
         scoringMatrix: tournament.scoring_rules || [],
@@ -1114,7 +1109,7 @@ router.patch("/:subdomain/tournaments/:id", async (req, res) => {
         tournamentName: tournament.name,
         source: tournament.api_league_id ? (tournament.api_league_id === 39 ? "epl" : tournament.api_league_id === 2 ? "ucl" : tournament.api_league_id === 1 ? "wc" : "static") : "static",
         budgetCap: tournament.team_budget !== undefined ? Number(tournament.team_budget) : 100,
-        squadSize: 11,
+        squadSize: 11 + (tournament.substitutes_allowed !== undefined ? Number(tournament.substitutes_allowed) : 4),
         transfersPerMatch: tournament.transfers_per_match !== undefined ? Number(tournament.transfers_per_match) : 2,
         captainMultiplier: tournament.captain_vice_captain ? 2 : 1,
         scoringMatrix: tournament.scoring_rules || [],

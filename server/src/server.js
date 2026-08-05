@@ -9,3 +9,11 @@ app.listen(port, () => {
 });
 // Trigger watch reload v7
 
+
+// Trigger restart
+
+// Trigger restart for CricAPI
+
+// Restart again
+
+// Restart again after fixing SQL placeholders

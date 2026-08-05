@@ -857,6 +857,20 @@ router.get("/tournaments", async (req, res) => {
   }
 });
 
+router.get("/tournaments/:id/contests", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM contests WHERE tournament_id = $1 AND partner_id = $2 AND status != 'Draft' ORDER BY created_at DESC",
+      [id, req.partner.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(`GET /tournaments/${id}/contests failed:`, err.message);
+    res.status(500).json({ error: "Failed to load contests" });
+  }
+});
+
 /**
  * GET /api/public/sdk-status
  * Checks if SDK is UNCONFIGURED or PUBLISHED for the current partner tenant

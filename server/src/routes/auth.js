@@ -1,9 +1,11 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { pool } from "../db.js";
+import { signJwt, verifyJwt } from "../lib/jwt.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
+const JWT_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
 
 router.post("/login", async (req, res) => {
   const { email, password } = req.body || {};
@@ -25,15 +27,25 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
+  // Set session cookie (works for same-origin / localhost)
   req.session.superadminId = admin.id;
-  res.json({ id: admin.id, name: admin.name, email: admin.email });
+
+  // Also issue a JWT token (works for cross-origin / Vercel + ngrok)
+  const token = signJwt({ superadminId: admin.id }, JWT_SECRET, 60 * 60 * 24 * 7);
+
+  res.json({ id: admin.id, name: admin.name, email: admin.email, token });
 });
 
 router.post("/logout", (req, res) => {
-  req.session.destroy(() => {
+  if (req.session) {
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      return res.json({ ok: true });
+    });
+  } else {
     res.clearCookie("connect.sid");
-    res.json({ ok: true });
-  });
+    return res.json({ ok: true });
+  }
 });
 
 router.get("/me", requireAuth, async (req, res) => {

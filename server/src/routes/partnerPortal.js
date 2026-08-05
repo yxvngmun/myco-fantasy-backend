@@ -27,6 +27,10 @@ const JWT_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
       UPDATE partner_sports_sdk 
       SET sport_key = 'cricket' 
       WHERE tournament_id IN (SELECT id FROM tournaments WHERE sport_key = 'cricket');
+
+      UPDATE partners 
+      SET sports = '["football", "cricket", "basketball"]'::jsonb
+      WHERE subdomain = 'footypool';
     `).catch((e) => console.warn("Cricket migration warning:", e.message));
   } catch (e) {
     // Ignore migration warning

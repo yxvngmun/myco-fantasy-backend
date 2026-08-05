@@ -23,3 +23,5 @@ app.listen(port, () => {
 // Trigger restart for tournament delete & status routes
 
 // Trigger restart for unique_partner_tournament & cricket sport_key migration
+
+// Trigger restart for partner sports array migration

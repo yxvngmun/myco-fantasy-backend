@@ -9,6 +9,41 @@ router.use(requirePartnerAuth);
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function resolvePosName(playerPos, sportConfig) {
+  if (!sportConfig || sportConfig.key === "football") return playerPos;
+  
+  const pLower = (playerPos || "").toLowerCase().trim();
+  
+  const exactMatch = sportConfig.positions?.find(p => p.name.toLowerCase() === pLower);
+  if (exactMatch) return exactMatch.name;
+
+  const match = sportConfig.positions?.find(p => {
+    const configName = p.name.toLowerCase();
+    const configNorm = configName.replace(/[^a-z]/g, "");
+    const pNorm = pLower.replace(/[^a-z]/g, "");
+
+    if (configNorm && pNorm && (pNorm.includes(configNorm) || configNorm.includes(pNorm))) return true;
+    
+    // Cricket specific heuristics & abbreviations
+    if (configName.includes("all") || configName === "ar") {
+      if (pLower === "ar" || pLower.includes("allrounder") || pLower.includes("all-rounder") || pLower.includes("all rounder")) return true;
+    }
+    if (configName.includes("wicket") || configName === "wk") {
+      if (pLower === "wk" || pLower.includes("wk") || pLower.includes("keeper")) return true;
+    }
+    if (configName.includes("bat") || configName === "bat") {
+      if ((pLower === "bat" || pLower.includes("bat")) && !pLower.includes("wk") && !pLower.includes("all")) return true;
+    }
+    if (configName.includes("bowl") || configName === "bowl") {
+      if (pLower === "bowl" || pLower.includes("bowl")) return true;
+    }
+    
+    return false;
+  });
+
+  return match ? match.name : playerPos;
+}
+
 // Middleware to verify that the requested tournament (and its associated sport config) are active
 router.use(async (req, res, next) => {
   // Only apply to routes that take tournament parameter and are not the config/status/list routes
@@ -463,10 +498,6 @@ router.post("/squad", requireUserAuth, async (req, res) => {
   const { playerIds, captainId, tournamentId, teamName, country, activeChip } = req.body || {};
   if (!tournamentId) return res.status(400).json({ error: "tournamentId is required" });
 
-  if (!Array.isArray(playerIds) || playerIds.length !== 15) {
-    return res.status(400).json({ error: "Squad must contain exactly 15 players" });
-  }
-
   try {
     // Fetch the tournament to get sport_key
     const { rows: tournRows } = await pool.query("SELECT * FROM tournaments WHERE id = $1", [tournamentId]);
@@ -502,7 +533,8 @@ router.post("/squad", requireUserAuth, async (req, res) => {
     for (const p of players) {
       totalCost += Number(p.val);
       clubCounts[p.club] = (clubCounts[p.club] || 0) + 1;
-      posCounts[p.pos] = (posCounts[p.pos] || 0) + 1;
+      const normalizedPos = resolvePosName(p.pos, sportConfig);
+      posCounts[normalizedPos] = (posCounts[normalizedPos] || 0) + 1;
     }
 
     if (totalCost > 100) {

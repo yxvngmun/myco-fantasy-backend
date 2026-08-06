@@ -36,6 +36,9 @@ const patchableFields = {
 };
 const jsonFields = new Set(["positions", "defaultScoring", "tournamentTypes"]);
 
+// Fields that must be integers - coerce to prevent Postgres type errors (e.g. "7.5" for INTEGER column)
+const intFields = new Set(["squadSize"]);
+
 router.patch("/:key", async (req, res) => {
   const { key } = req.params;
   const b = req.body || {};
@@ -46,20 +49,32 @@ router.patch("/:key", async (req, res) => {
   for (const [field, column] of Object.entries(patchableFields)) {
     if (field in b) {
       updates.push(`${column} = $${i++}`);
-      values.push(jsonFields.has(field) ? JSON.stringify(b[field]) : b[field]);
+      let val = b[field];
+      if (jsonFields.has(field)) {
+        val = JSON.stringify(val);
+      } else if (intFields.has(field)) {
+        // squad_size is INTEGER in Postgres; round any decimal input (e.g. 7.5 → 8)
+        val = Math.round(Number(val));
+      }
+      values.push(val);
     }
   }
   if (updates.length === 0) {
     return res.status(400).json({ error: "Nothing to update" });
   }
 
-  values.push(key);
-  const { rows } = await pool.query(
-    `UPDATE sports_config SET ${updates.join(", ")} WHERE key = $${i} RETURNING *`,
-    values
-  );
-  if (!rows[0]) return res.status(404).json({ error: "Sport not found" });
-  res.json(serialize(rows[0]));
+  try {
+    values.push(key);
+    const { rows } = await pool.query(
+      `UPDATE sports_config SET ${updates.join(", ")} WHERE key = $${i} RETURNING *`,
+      values
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Sport not found" });
+    res.json(serialize(rows[0]));
+  } catch (err) {
+    console.error("PATCH /sports/:key error:", err.message);
+    res.status(500).json({ error: err.message || "Failed to update sport" });
+  }
 });
 
 export default router;

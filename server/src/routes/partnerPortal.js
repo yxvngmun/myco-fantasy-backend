@@ -932,7 +932,10 @@ router.get("/:subdomain/tournaments", async (req, res) => {
               s.name as sport_name, 
               s.squad_size, 
               s.positions as sport_positions, 
-              s.default_scoring as sport_default_scoring
+              s.default_scoring as sport_default_scoring,
+              COALESCE((SELECT COUNT(*) FROM user_squads WHERE tournament_id = t.id), 0)::int as registered_squads,
+              COALESCE((SELECT COUNT(*) FROM contests WHERE tournament_id = t.id), 0)::int as total_contests,
+              COALESCE((SELECT SUM(COALESCE(entry_fee, 0) * COALESCE(joined_entries, 0)) FROM contests WHERE tournament_id = t.id), 0)::float as total_revenue
        FROM tournaments t
        JOIN sports_config s ON t.sport_key = s.key
        WHERE t.partner_id = $1 

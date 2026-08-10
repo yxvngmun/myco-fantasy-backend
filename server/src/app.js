@@ -115,7 +115,6 @@ export function createApp() {
         httpOnly: true,
         secure: false, // dynamically overridden
         sameSite: "lax", // dynamically overridden
-        maxAge: 1000 * 60 * 60 * 24 * 7,
       },
     })
   );

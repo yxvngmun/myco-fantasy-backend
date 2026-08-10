@@ -80,7 +80,7 @@ router.post("/invite", async (req, res) => {
     );
 
     const invite = rows[0];
-    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || "http://localhost:5175";
+    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || req.headers.origin || "http://localhost:5175";
     const registerUrl = `${partnerPortalUrl}/register?token=${token}`;
 
     // Dispatch Onboarding Email
@@ -288,8 +288,8 @@ router.post("/:id/approve-kyc", async (req, res) => {
     }
 
     const partner = rows[0];
-    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || "http://localhost:5175";
-    const portalUrl = `${partnerPortalUrl}/?subdomain=${partner.subdomain}`;
+    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || req.headers.origin || "http://localhost:5175";
+    const portalUrl = `${partnerPortalUrl}/portal?subdomain=${partner.subdomain}`;
 
     // Dispatch Activation Confirmation Email with Login Credentials
     await sendEmail({

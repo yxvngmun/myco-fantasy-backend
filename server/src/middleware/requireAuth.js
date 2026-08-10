@@ -8,16 +8,15 @@ export function requireAuth(req, res, next) {
   const authHeader = req.headers["authorization"];
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7);
-    const payload = verifyJwt(token, JWT_SECRET);
-    if (payload && payload.superadminId) {
-      req.session.superadminId = payload.superadminId;
-      return next();
+    try {
+      const payload = verifyJwt(token, JWT_SECRET);
+      if (payload && payload.superadminId) {
+        req.session.superadminId = payload.superadminId;
+        return next();
+      }
+    } catch (err) {
+      // Token verification failed
     }
-  }
-
-  // 2. Fall back to session cookie
-  if (req.session?.superadminId) {
-    return next();
   }
 
   return res.status(401).json({ error: "Not authenticated" });

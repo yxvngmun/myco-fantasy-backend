@@ -80,7 +80,7 @@ router.post("/invite", async (req, res) => {
     );
 
     const invite = rows[0];
-    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || req.headers.origin || "http://localhost:5175";
+    const partnerPortalUrl = process.env.PARTNER_PORTAL_URL || req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null) || "http://localhost:5175";
     const registerUrl = `${partnerPortalUrl}/register?token=${token}`;
 
     // Dispatch Onboarding Email
@@ -561,7 +561,7 @@ router.post("/:subdomain/contests", async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO contests (
          partner_id, tournament_id, name, category, entry_fee, max_entries,
-         prize_pool, status, prize_curve
+         prize_pool, status, winner_distribution
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'Upcoming', $8)
        RETURNING *`,
@@ -665,6 +665,7 @@ router.get("/:subdomain/branding", async (req, res) => {
       supportEmail: p.support_email,
       termsContent: p.terms_content,
       privacyContent: p.privacy_content,
+      deployedUrl: p.deployed_url,
     });
   } catch (err) {
     console.error("Get branding error:", err);
@@ -687,8 +688,9 @@ router.put("/:subdomain/branding", async (req, res) => {
          welcome_message = COALESCE($6, welcome_message),
          support_email = COALESCE($7, support_email),
          terms_content = COALESCE($8, terms_content),
-         privacy_content = COALESCE($9, privacy_content)
-       WHERE subdomain = $10
+         privacy_content = COALESCE($9, privacy_content),
+         deployed_url = COALESCE($10, deployed_url)
+       WHERE subdomain = $11
        RETURNING *`,
       [
         b.name,
@@ -700,6 +702,7 @@ router.put("/:subdomain/branding", async (req, res) => {
         b.supportEmail,
         b.termsContent,
         b.privacyContent,
+        b.deployedUrl,
         subdomain,
       ]
     );
@@ -935,7 +938,7 @@ router.get("/:subdomain/tournaments", async (req, res) => {
               s.default_scoring as sport_default_scoring,
               COALESCE((SELECT COUNT(*) FROM user_squads WHERE tournament_id = t.id), 0)::int as registered_squads,
               COALESCE((SELECT COUNT(*) FROM contests WHERE tournament_id = t.id), 0)::int as total_contests,
-              COALESCE((SELECT SUM(COALESCE(entry_fee, 0) * COALESCE(joined_entries, 0)) FROM contests WHERE tournament_id = t.id), 0)::float as total_revenue
+              COALESCE((SELECT SUM(COALESCE(entry_fee, 0) * COALESCE(current_entries, 0)) FROM contests WHERE tournament_id = t.id), 0)::float as total_revenue
        FROM tournaments t
        JOIN sports_config s ON t.sport_key = s.key
        WHERE t.partner_id = $1 

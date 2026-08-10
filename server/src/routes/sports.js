@@ -20,8 +20,13 @@ function serialize(row) {
 }
 
 router.get("/", async (req, res) => {
-  const { rows } = await pool.query("SELECT * FROM sports_config ORDER BY name");
-  res.json(rows.map(serialize));
+  try {
+    const { rows } = await pool.query("SELECT * FROM sports_config ORDER BY name");
+    res.json(rows.map(serialize));
+  } catch (err) {
+    console.error("GET /sports error:", err.message);
+    res.status(500).json({ error: "Failed to load sports" });
+  }
 });
 
 const patchableFields = {
@@ -40,30 +45,29 @@ const jsonFields = new Set(["positions", "defaultScoring", "tournamentTypes"]);
 const intFields = new Set(["squadSize"]);
 
 router.patch("/:key", async (req, res) => {
-  const { key } = req.params;
-  const b = req.body || {};
-
-  const updates = [];
-  const values = [];
-  let i = 1;
-  for (const [field, column] of Object.entries(patchableFields)) {
-    if (field in b) {
-      updates.push(`${column} = $${i++}`);
-      let val = b[field];
-      if (jsonFields.has(field)) {
-        val = JSON.stringify(val);
-      } else if (intFields.has(field)) {
-        // squad_size is INTEGER in Postgres; round any decimal input (e.g. 7.5 → 8)
-        val = Math.round(Number(val));
-      }
-      values.push(val);
-    }
-  }
-  if (updates.length === 0) {
-    return res.status(400).json({ error: "Nothing to update" });
-  }
-
   try {
+    const { key } = req.params;
+    const b = req.body || {};
+
+    const updates = [];
+    const values = [];
+    let i = 1;
+    for (const [field, column] of Object.entries(patchableFields)) {
+      if (field in b) {
+        updates.push(`${column} = $${i++}`);
+        let val = b[field];
+        if (jsonFields.has(field)) {
+          val = JSON.stringify(val);
+        } else if (intFields.has(field)) {
+          val = Math.round(Number(val));
+        }
+        values.push(val);
+      }
+    }
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "Nothing to update" });
+    }
+
     values.push(key);
     const { rows } = await pool.query(
       `UPDATE sports_config SET ${updates.join(", ")} WHERE key = $${i} RETURNING *`,

@@ -566,13 +566,23 @@ async function runCricketLiveSync(tournamentId, leagueId, season) {
     if (s.players) {
       for (const p of s.players) {
         const pos = p.role ? p.role : 'Batsman';
+        let numId = 0;
+        if (typeof p.id === 'string') {
+          for (let i = 0; i < p.id.length; i++) {
+            numId = ((numId << 5) - numId) + p.id.charCodeAt(i);
+            numId |= 0;
+          }
+          numId = Math.abs(numId);
+        } else {
+          numId = Number(p.id);
+        }
         playersToInsert.push({
-          id: p.id,
+          id: numId,
           name: p.name,
           club: tName,
           short: p.name.split(' ').slice(-1)[0],
           pos: pos === 'Wicketkeeper' ? 'Wicket-Keeper' : pos,
-          val: 5.0 + (p.id.length % 5),
+          val: 5.0 + (numId % 5),
         });
       }
     }

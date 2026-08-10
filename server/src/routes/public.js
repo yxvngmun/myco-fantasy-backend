@@ -633,7 +633,7 @@ router.post("/squad", requireUserAuth, async (req, res) => {
         req.user.id,
         tournamentId,
         JSON.stringify(validPlayerIds),
-        captainId || null,
+        numCaptainId,
         bankRemaining,
         sanitizedTeamName,
         country || req.user.country || "United Kingdom",

@@ -43,8 +43,8 @@ function serialize(row) {
     legalCompanyName: row.legal_company_name,
     tax_id: row.tax_id,
     taxId: row.tax_id,
-    support_email: row.support_email,
     supportEmail: row.support_email,
+    deployed_url: row.deployed_url,
   };
 }
 
